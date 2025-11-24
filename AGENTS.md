@@ -27,3 +27,17 @@
 - Use clear, imperative commit subjects (`Add dashboard stats cards`, `Fix gallery image fallback`). If you introduce a series, group related changes logically.
 - PRs should include: scope summary, screenshots for visual updates, reproduction steps for fixes, and a checklist of commands run (`npm run build`, tests if added).
 - Link related issues or tasks; note any follow-ups or known gaps explicitly.
+
+## Current State & Context Prompt
+- Frontend only (Vite + React, Tailwind output in `src/styles/tailwind.generated.css`); no backend. Main entry `src/main.tsx` → `src/App.tsx`.
+- Pages now live in `src/pages`. Engagement event removed everywhere; active events: Malka, Henna Night, Bride Preparation, Wedding Night, Honeymoon.
+- Onboarding (`src/pages/Onboarding.tsx`): cards laid out as auto-fit tiles (~360–420px wide), selection dot top-right, mood-board toggle bottom-right. Toggles are muted when card unselected and rosy when active. CTA centered below grid.
+- Landing text widened and centered; gallery filters updated; calendar legend excludes Engagement. DB schema reference at `docs/db-schema.sql`.
+- Tests: `npm run test` (Vitest smoke). Build: `npm run build`.
+
+Use this prompt to start a new chat with context:
+```
+You are working on Muse, a Vite + React frontend (no backend). Entrypoint: src/main.tsx → src/App.tsx. Pages are under src/pages; engagement event was removed, leaving Malka, Henna Night, Bride Preparation, Wedding Night, Honeymoon.
+Onboarding (src/pages/Onboarding.tsx): auto-fit grid tiles (~360–420px wide), selection dot top-right, mood-board toggle bottom-right. Toggles are greyed when the card is unselected and rosy when active/selected. CTA is centered below the grid. Landing text is widened/centered. Gallery filters exclude Engagement. Calendar colors exclude Engagement. DB schema doc at docs/db-schema.sql. Tests: npm run test; build: npm run build.
+Follow existing styling (Tailwind output in src/styles/tailwind.generated.css) and prefer hooks/function components. Keep commits imperative and include screenshots for UI changes.
+```
