@@ -3,7 +3,6 @@ import { Navigation } from '../components/Navigation';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
 const eventColors: Record<string, string> = {
-  engagement: 'bg-rose-200',
   malka: 'bg-rose-300',
   'bride-prep': 'bg-peach-200',
   henna: 'bg-rose-400',

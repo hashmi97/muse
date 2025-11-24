@@ -3,7 +3,7 @@ import { Navigation } from '../components/Navigation';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { X, Heart, Download } from 'lucide-react';
 
-const eventFilters = ['All', 'Engagement', 'Malka', 'Bride Prep', 'Henna', 'Wedding', 'Honeymoon'];
+const eventFilters = ['All', 'Malka', 'Bride Prep', 'Henna', 'Wedding', 'Honeymoon'];
 
 const galleryImages = [
   { id: 1, src: 'https://images.unsplash.com/photo-1722872112546-936593441be8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3ZWRkaW5nJTIwaW5zcGlyYXRpb24lMjBlbGVnYW50fGVufDF8fHx8MTc2Mzk3NjQ2NXww&ixlib=rb-4.1.0&q=80&w=1080', event: 'Wedding', tall: true },
@@ -13,7 +13,6 @@ const galleryImages = [
   { id: 5, src: 'https://images.unsplash.com/photo-1753541306536-7847bcc0489d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxyb21hbnRpYyUyMGZsb3dlcnMlMjBzb2Z0fGVufDF8fHx8MTc2Mzg4NDMyN3ww&ixlib=rb-4.1.0&q=80&w=1080', event: 'Henna', tall: false },
   { id: 6, src: 'https://images.unsplash.com/photo-1658851866325-49fb8b7fbcb2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxyb21hbnRpYyUyMHN1bnNldCUyMGNvdXBsZXxlbnwxfHx8fDE3NjM5NzM2NjN8MA&ixlib=rb-4.1.0&q=80&w=1080', event: 'Honeymoon', tall: true },
   { id: 7, src: 'https://images.unsplash.com/photo-1648538923547-074724ca7a18?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxob25leW1vb24lMjBkZXN0aW5hdGlvbiUyMGJlYWNofGVufDF8fHx8MTc2Mzk3NjQ2Nnww&ixlib=rb-4.1.0&q=80&w=1080', event: 'Honeymoon', tall: false },
-  { id: 8, src: 'https://images.unsplash.com/photo-1762941744800-385b067dff21?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxlbGVnYW50JTIwY291cGxlJTIwd2VkZGluZ3xlbnwxfHx8fDE3NjM5NzY0NjR8MA&ixlib=rb-4.1.0&q=80&w=1080', event: 'Engagement', tall: true },
 ];
 
 export function GalleryPage() {
