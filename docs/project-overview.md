@@ -7,7 +7,7 @@ You are helping me build Muse, a full-stack web application.
 
 Muse is a wedding planning platform for a couple (two users sharing one workspace). It should support:
 	•	Shared planning (both partners see and edit the same workspace)
-	•	Event planning (Malka, Henna Night, Bride Preparation, Wedding Night, Honeymoon; Engagement event type still exists in the data model)
+	•	Event planning (Malka, Henna Night, Bride Preparation, Wedding Night, Honeymoon; Engagement exists only as a calendar milestone)
 	•	Mood boards per event + a global inspiration gallery
 	•	A shared calendar of events and dates
 	•	Combined, event-based budgeting
@@ -37,13 +37,13 @@ The project currently has:
 	•	Onboarding event selection page:
 	•	Event cards in a responsive grid (~360–420px width each)
 	•	Current visible events in the UI: Malka, Henna Night, Bride Preparation, Wedding Night, Honeymoon
-	•	Note: Engagement still exists as an event type in the domain/data, but is currently not shown in the onboarding UI. Don’t delete it from the model; keep it available for future use.
+	•	Note: Engagement remains in the domain/data but is used only as a calendar milestone (not shown in onboarding, gallery, budgets, or mood boards).
 	•	Each card has:
 	•	A selection state (selected/unselected)
 	•	A mood board toggle that activates only when the card is selected (greyed out when not selected)
 	•	Events have default mood board enabled/disabled states defined in the data model; UI should respect those defaults when selected
-	•	Calendar view with event legend (colors for each event type; Engagement is excluded in the UI legend for now, but still exist as a type)
-	•	Gallery page with filters (also currently excluding Engagement)
+	•	Calendar view with event legend (includes Engagement as milestone-only; other flows exclude it)
+	•	Gallery page with filters (Engagement excluded)
 	•	Nav + general layout and sample static data
 
 There is also a database schema draft in docs/db-schema.sql that defines the relational model (Postgres-style).
@@ -89,7 +89,7 @@ Auth & Workspace:
 
 Events & Types:
 	•	event_types: Static lookup of possible event types:
-	•	engagement, malka, bride_prep, henna_night, wedding_night, honeymoon, etc.
+	•	engagement (milestone-only), malka, bride_prep, henna_night, wedding_night, honeymoon, etc.
 	•	Each has a default color and default mood board enabled flag.
 	•	events: An instance of an event for a couple (e.g., “Our Henna Night”), with start_date, end_date, is_active, etc.
 	•	These feed the calendar and event pages.
@@ -136,7 +136,7 @@ The app should support at least these flows end-to-end:
 	•	Bride accepts invite → they both share the same couple workspace.
 	•	Basic login/log out.
 	2.	Onboarding
-	•	Choose which events are part of their wedding (Malka, Henna Night, Bride Preparation, Wedding Night, Honeymoon; Engagement as an optional future event type).
+	•	Choose which events are part of their wedding (Malka, Henna Night, Bride Preparation, Wedding Night, Honeymoon; Engagement is milestone-only and not selectable).
 	•	For each selected event, allow enabling/disabling the Mood Board.
 	•	Save these selections in the DB (events, mood_boards).
 	3.	Dashboard
