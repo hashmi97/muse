@@ -238,4 +238,43 @@ Start by restating your understanding of the architecture and data model, then g
 	4.	The frontend wiring to those APIs
 	5.	Deployment notes and scripts
 
+⸻
+
+6. Execution Plan (Recommended Next Steps)
+
+If you are continuing the build, use this sequence to keep momentum and avoid rework:
+	•	Backend skeleton: add /backend with Node+TS (Express or Fastify), env loading, response envelope { data, error }, and a health check.
+	•	ORM and DB: add Prisma targeting Postgres; import/adapt docs/db-schema.sql into Prisma schema; run initial migration; seed sample couple and events (Malka, Henna Night, Bride Preparation, Wedding Night, Honeymoon; keep Engagement as calendar-milestone-only).
+	•	Auth: implement signup/login/refresh/logout with JWT (HS256), bcrypt hashing, refresh in HTTP-only SameSite Lax cookie, access token in responses; add invite token flow to activate couple_members.
+	•	Core routes: couples/events (selection and moodboard defaults), calendar read, moodboard CRUD, budget CRUD, honeymoon CRUD, comments, activity feed; exclude Engagement from onboarding/gallery/budgets.
+	•	Storage: wire an S3 client with a local-disk adapter for dev; envs for S3 bucket/region/keys.
+	•	Frontend integration: add a typed API client in src/lib/api (base /api, envelope handling); replace static data in onboarding and gallery with real endpoints; implement auth token handling with refresh cookie flow.
+	•	Tooling/docs: add npm scripts (dev:backend, dev:full), extend README/AGENTS with run steps, env vars, and deploy notes (FE: Vercel/Netlify; BE: ECS/Fargate or Fly.io; DB: RDS/Neon; storage: S3).
+
+Work in this order unless a blocker arises: backend skeleton → DB + migrations → auth → core routes → S3 stub → frontend wiring → docs/tooling.
+
+Progress Update (Current Status)
+
+Backend:
+• Express + TypeScript app scaffolded with shared app factory (`src/app.ts`) and server bootstrap (`src/server.ts`).
+• Auth implemented: signup/login/refresh/logout with bcrypt password hashing, JWT access/refresh, refresh cookie (HTTP-only, SameSite Lax), and envelope `{ data, error }` responses.
+• Events/onboarding: event types endpoint (onboardingOnly excludes engagement), event selection upsert (creates/updates events and moodboard enabled flags, deactivates non-selected), events list for the couple. Engagement is still milestone-only (skipped in onboarding).
+• Calendar: `GET /api/calendar` returns events for the authenticated couple.
+• Moodboard: list/create/delete items (expects existing media_id; storage stub in place). Ownership checks enforced by couple membership.
+• Middleware: JWT requireAuth middleware for protected routes; cookie parsing enabled.
+• Prisma schema aligned with domain (users/couples/events/moodboards/budgets/honeymoon/tasks/comments/activity/notifications); comments use polymorphic `target_type/target_id` scalars. Event type seeds include engagement (milestone-only) and the 5 active onboarding events.
+• Tests: Vitest + Supertest with DB reset/seed helpers; coverage for auth, events selection, calendar, and moodboard flows. Tests require a running Postgres test DB and wipe/seed it each run.
+• Storage: placeholder S3/local stub pending real integration.
+
+Frontend:
+• Still using static data; no API wiring yet. UI updated to exclude engagement from onboarding/gallery/budgets, moodboard toggles, and calendar legend includes engagement as milestone-only.
+
+Next Steps (Recommended)
+• Replace static frontend calls with real API client (base `/api`, handle refresh cookie + access token).
+• Add budget endpoints (list/update event budgets, categories, line items) and honeymoon CRUD; wire calendar/moodboard to uploads when storage is ready.
+• Implement media upload (S3 client + local dev adapter) and add a media creation endpoint for moodboards.
+• Extend tests for budgets/honeymoon/comments/activity; add seed helpers for media to simplify moodboard tests.
+• Update README/AGENTS with backend run/test instructions and Postman/Vitest notes; add Dockerfiles for FE/BE if desired.
+• Keep Engagement as calendar-only unless requirements change; ensure filters/onboarding continue to exclude it.
+
 You can work incrementally, but keep everything consistent and production-minded.
