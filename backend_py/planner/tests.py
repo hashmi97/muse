@@ -1,0 +1,52 @@
+from django.core.files.uploadedfile import SimpleUploadedFile
+from rest_framework import status
+from rest_framework.test import APITestCase
+from rest_framework_simplejwt.tokens import AccessToken
+from accounts.models import User
+from .models import Couple, CoupleMember, EventType, Event, MoodBoardItem, MediaFile
+
+
+class PlannerPingTests(APITestCase):
+    def test_ping(self):
+        res = self.client.get("/api/ping/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.json()["data"]["status"], "ok")
+
+
+class MoodboardFlowTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(email="user@example.com", password="password123")
+        self.couple = Couple.objects.create(name="Test Couple")
+        CoupleMember.objects.create(couple=self.couple, user=self.user, status="active", role="bride", is_owner=True)
+        self.event_type = EventType.objects.create(key="wedding_night", name_en="Wedding Night")
+        self.event = Event.objects.create(couple=self.couple, event_type=self.event_type, title="Wedding Night")
+        token = AccessToken.for_user(self.user)
+        self.auth = {"HTTP_AUTHORIZATION": f"Bearer {str(token)}"}
+
+    def test_media_upload_and_moodboard_crud(self):
+        # upload media
+        file = SimpleUploadedFile("test.jpg", b"filecontent", content_type="image/jpeg")
+        res = self.client.post("/api/media/upload/", {"file": file}, **self.auth)
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        media_id = res.json()["data"]["id"]
+        self.assertTrue(MediaFile.objects.filter(id=media_id).exists())
+
+        # create moodboard item
+        res = self.client.post(
+            f"/api/moodboard/{self.event.id}/items/",
+            {"media_id": media_id, "caption": "nice"},
+            **self.auth,
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        item_id = res.json()["data"]["id"]
+        self.assertTrue(MoodBoardItem.objects.filter(id=item_id).exists())
+
+        # list moodboard
+        res = self.client.get(f"/api/moodboard/{self.event.id}/", **self.auth)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.json()["data"]["items"]), 1)
+
+        # delete item
+        res = self.client.delete(f"/api/moodboard/items/{item_id}/", **self.auth)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertFalse(MoodBoardItem.objects.filter(id=item_id).exists())

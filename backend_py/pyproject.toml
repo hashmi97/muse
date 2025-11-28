@@ -1,0 +1,26 @@
+[project]
+name = "muse-backend-py"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Hisham",email = "46504631+hashmi97@users.noreply.github.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "django (==4.2.13)",
+    "djangorestframework (==3.15.1)",
+    "djangorestframework-simplejwt (==5.3.1)",
+    "django-cors-headers (==4.3.1)",
+    "django-environ (==0.11.2)",
+    "psycopg2-binary (==2.9.9)",
+    "pytest (==8.3.3)",
+    "pytest-django (==4.9.0)"
+]
+
+[tool.poetry]
+packages = [{include = "backend_py", from = "src"}]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

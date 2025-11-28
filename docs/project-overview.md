@@ -278,3 +278,86 @@ Next Steps (Recommended)
 • Keep Engagement as calendar-only unless requirements change; ensure filters/onboarding continue to exclude it.
 
 You can work incrementally, but keep everything consistent and production-minded.
+
+⸻
+
+Django + DRF Migration Plan (if we pivot to Python)
+If we decide to replace the Node/Prisma backend with Django + Django REST Framework, follow this path to keep parity with the current feature set and data model.
+
+High-level choice
+• Framework: Django + Django REST Framework (DRF) for batteries-included admin, auth, and ORM; stick with Postgres. Use django-environ for settings and dj-database-url for DATABASE_URL parsing.
+• ORM/migrations: Django ORM with standard migrations. Seed `event_types` via a data migration or a simple management command.
+
+Step-by-step implementation
+1) Project bootstrap
+   • Create a new Django project under `backend_py/` (keep Node backend intact until the cutover). Example: `django-admin startproject muse_backend`.
+   • Create a core app, e.g., `apps/core`, and additional apps for `accounts`, `events`, `moodboard`, `budget`, `honeymoon`, `comments_activity`.
+   • Configure settings for Postgres via `DATABASE_URL`, add DRF, CORS headers, and JWT auth (djangorestframework-simplejwt or rest_framework_simplejwt).
+2) Models (map from current Prisma schema)
+   • users: email (unique), password (Django auth or custom user), full_name, role (choices: bride/groom/other), avatar (FK to media_files or URL).
+   • couples, couple_members (role choices bride/groom/viewer/editor, status invited/active/left, is_owner).
+   • event_types (key, name fields, default_color_hex, default_moodboard_enabled), seed with engagement + the 5 onboarding events.
+   • events (FK couple, FK event_type, title, description, start/end, is_active, unique_together on couple + event_type).
+   • media_files (FK couple, storage_key/url, mime_type, size_bytes, uploaded_by).
+   • mood_boards (FK event, is_enabled), mood_board_items (FK mood_board, FK media_file, caption, position, created_by), mood_board_reactions (unique on item+user+type).
+   • budgets: event_budgets, budget_categories, event_budget_categories, budget_line_items (with optional receipt media FK, created_by).
+   • honeymoon_plans/items.
+   • tasks; comments (target_type/target_id polymorphic via generic foreign key or explicit target fields); activity_log; notifications (optional).
+3) Auth & permissions
+   • Use SimpleJWT for access/refresh tokens; set refresh cookie HTTP-only SameSite Lax, access in response body. Add permission classes to enforce couple membership on event-scoped endpoints.
+   • Add signup/login/logout/refresh endpoints; an invite acceptance endpoint that flips `couple_members.status` to active.
+4) API endpoints (match current routes)
+   • /auth/signup, /auth/login, /auth/refresh, /auth/logout.
+   • /events/types?onboardingOnly=true (exclude engagement), /events (list for couple), /events/selection (upsert selected events + moodboard enabled defaults; skip engagement).
+   • /calendar (list events for couple).
+   • /moodboard/:eventId (list), /moodboard/:eventId/items (create), /moodboard/items/:id (delete).
+   • Later: /budget/*, /honeymoon/*, /comments, /activity.
+5) File uploads
+   • Add a media upload endpoint: DRF view using django-storages + boto3 for S3; local storage backend for dev. Response should return media id and URL to use in moodboard items.
+6) Admin & seeds
+   • Register core models in Django admin for quick back-office edits.
+   • Add a management command or data migration to seed event_types (and any defaults).
+7) Testing
+   • Use pytest or Django’s TestCase + DRF APIClient. Mirror existing happy-path coverage: auth, events selection, calendar, moodboard item create/delete, media upload stub. Use a test database with migrations applied per run.
+8) Cutover
+   • Keep the current Node backend running until feature parity is reached.
+   • Once Django API matches the contract, point the frontend `/api` base to the new service and retire the Node API.
+
+Environment variables (Django)
+• DATABASE_URL
+• SECRET_KEY
+• DEBUG (False in prod)
+• ALLOWED_HOSTS
+• CORS_ALLOWED_ORIGINS / CSRF_TRUSTED_ORIGINS
+• SIMPLEJWT settings (access/refresh lifetimes)
+• FRONTEND_URL
+• S3_BUCKET, S3_REGION, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY (for uploads)
+
+Suggested next steps (if adopting Django now)
+• Scaffold `backend_py/` with Django + DRF + SimpleJWT, Postgres config, and CORS.
+• Implement models for users/couples/event_types/events/moodboards/media first; add a media upload endpoint and event selection endpoints.
+• Add minimal tests (signup/login, event types, selection, moodboard list/create/delete) to reach parity with current coverage.
+• Wire the frontend to the new endpoints once stable; then decommission the Node backend.
+
+Django backend (backend_py) quickstart — work in progress
+• Location: backend_py (Poetry-managed; venv at backend_py/.venv).
+• One-time setup:
+  1) cd backend_py
+  2) poetry env use .venv/bin/python   # ensure Poetry points to the created venv
+  3) poetry install                    # if deps change
+• Env file: backend_py/.env (example)
+  SECRET_KEY=dev-secret-key
+  DEBUG=true
+  DATABASE_URL=sqlite:///db.sqlite3            # swap to postgres when ready
+  ALLOWED_HOSTS=localhost,127.0.0.1
+  CORS_ALLOWED_ORIGINS=http://localhost:5173
+  CSRF_TRUSTED_ORIGINS=http://localhost:5173
+• Run migrations: poetry run python manage.py migrate
+• Run dev server: poetry run python manage.py runserver 0.0.0.0:4000
+• Run tests: poetry run python manage.py test
+• Current endpoints:
+  - /api/health/ (no auth)
+  - /api/auth/signup, /api/auth/login, /api/auth/refresh, /api/auth/logout
+  - /api/ping/ (planner stub)
+• Models in place: custom User (email login), Couple, CoupleMember, EventType, Event, MediaFile, MoodBoard, MoodBoardItem, MoodBoardReaction.
+• Next to add in Django: event selection + types endpoints (exclude engagement), calendar read, moodboard CRUD wired to media upload, and budget/honeymoon/feeds.
