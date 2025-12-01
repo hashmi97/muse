@@ -339,8 +339,8 @@ Suggested next steps (if adopting Django now)
 • Add minimal tests (signup/login, event types, selection, moodboard list/create/delete) to reach parity with current coverage.
 • Wire the frontend to the new endpoints once stable; then decommission the Node backend.
 
-Django backend (backend_py) quickstart — work in progress
-• Location: backend_py (Poetry-managed; venv at backend_py/.venv).
+Django backend (backend) quickstart — work in progress
+• Location: backend (Poetry-managed; venv at backend/.venv or your poetry env).
 • One-time setup:
   1) cd backend_py
   2) poetry env use .venv/bin/python   # ensure Poetry points to the created venv
@@ -359,5 +359,23 @@ Django backend (backend_py) quickstart — work in progress
   - /api/health/ (no auth)
   - /api/auth/signup, /api/auth/login, /api/auth/refresh, /api/auth/logout
   - /api/ping/ (planner stub)
+  - /api/media/upload/ (multipart, requires active couple membership + Bearer)
+  - /api/moodboard/<event_id>/ (GET list/create items; Bearer)
+  - /api/moodboard/items/<item_id>/ (DELETE; Bearer)
 • Models in place: custom User (email login), Couple, CoupleMember, EventType, Event, MediaFile, MoodBoard, MoodBoardItem, MoodBoardReaction.
 • Next to add in Django: event selection + types endpoints (exclude engagement), calendar read, moodboard CRUD wired to media upload, and budget/honeymoon/feeds.
+
+Dev helper & test data (Django)
+• Seed a dev couple/membership and default event for any user:
+  python manage.py seed_dev_couple --email your_user@example.com [--event-key wedding_night]
+  - Assumes the user already exists (signup first).
+  - Creates/uses “Dev Couple”, makes the user active, seeds event type, and prints the event_id for moodboard tests.
+• Moodboard test flow (after seeding):
+  - Upload media (multipart key=file) to /api/media/upload/ with Bearer access token.
+  - Create item: POST /api/moodboard/<event_id>/items/ with {"media_id": <id>, "caption": "..."}.
+  - List: GET /api/moodboard/<event_id>/; Delete: DELETE /api/moodboard/items/<item_id>/.
+
+Repo structure notes / optimizations
+• Git on synced folders may block index.lock creation. Keeping the repo under ~/repos (or any non-synced path) avoids permission issues.
+• Frontend still points to static data; plan a switch-over to the Django API once endpoints reach parity.
+• Node backend has been removed; Django is the primary backend going forward.

@@ -1,4 +1,8 @@
+import shutil
+import tempfile
+from unittest import mock
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.conf import settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import AccessToken
@@ -14,6 +18,17 @@ class PlannerPingTests(APITestCase):
 
 
 class MoodboardFlowTests(APITestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._media_dir = tempfile.mkdtemp()
+        settings.MEDIA_ROOT = cls._media_dir
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls._media_dir, ignore_errors=True)
+        super().tearDownClass()
+
     def setUp(self):
         self.user = User.objects.create_user(email="user@example.com", password="password123")
         self.couple = Couple.objects.create(name="Test Couple")
@@ -26,7 +41,8 @@ class MoodboardFlowTests(APITestCase):
     def test_media_upload_and_moodboard_crud(self):
         # upload media
         file = SimpleUploadedFile("test.jpg", b"filecontent", content_type="image/jpeg")
-        res = self.client.post("/api/media/upload/", {"file": file}, **self.auth)
+        with self.settings(MEDIA_ROOT=self._media_dir), mock.patch("planner.views.FileSystemStorage.save", return_value="test.jpg"):
+            res = self.client.post("/api/media/upload/", {"file": file}, **self.auth)
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         media_id = res.json()["data"]["id"]
         self.assertTrue(MediaFile.objects.filter(id=media_id).exists())
