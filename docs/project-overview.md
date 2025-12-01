@@ -243,39 +243,38 @@ Start by restating your understanding of the architecture and data model, then g
 6. Execution Plan (Recommended Next Steps)
 
 If you are continuing the build, use this sequence to keep momentum and avoid rework:
-	•	Backend skeleton: add /backend with Node+TS (Express or Fastify), env loading, response envelope { data, error }, and a health check.
-	•	ORM and DB: add Prisma targeting Postgres; import/adapt docs/db-schema.sql into Prisma schema; run initial migration; seed sample couple and events (Malka, Henna Night, Bride Preparation, Wedding Night, Honeymoon; keep Engagement as calendar-milestone-only).
-	•	Auth: implement signup/login/refresh/logout with JWT (HS256), bcrypt hashing, refresh in HTTP-only SameSite Lax cookie, access token in responses; add invite token flow to activate couple_members.
-	•	Core routes: couples/events (selection and moodboard defaults), calendar read, moodboard CRUD, budget CRUD, honeymoon CRUD, comments, activity feed; exclude Engagement from onboarding/gallery/budgets.
-	•	Storage: wire an S3 client with a local-disk adapter for dev; envs for S3 bucket/region/keys.
-	•	Frontend integration: add a typed API client in src/lib/api (base /api, envelope handling); replace static data in onboarding and gallery with real endpoints; implement auth token handling with refresh cookie flow.
-	•	Tooling/docs: add npm scripts (dev:backend, dev:full), extend README/AGENTS with run steps, env vars, and deploy notes (FE: Vercel/Netlify; BE: ECS/Fargate or Fly.io; DB: RDS/Neon; storage: S3).
+	•	Backend (Django/DRF): in place with health, auth, events selection/calendar, media upload, moodboard CRUD, budget/honeymoon CRUD. Next: invites/acceptance, comments/activity, S3 storage.
+	•	DB/migrations: Django migrations applied. Next: seed event_types and budget_categories via data migration/command.
+	•	Auth: SimpleJWT with refresh cookie (done). Next: invite/accept flow to replace dev seeding helper.
+	•	Storage: currently local FileSystemStorage; add django-storages + boto3 for S3 in prod.
+	•	Frontend integration: add a typed API client (base /api, envelope handling); replace static onboarding/moodboard with live endpoints; handle auth tokens + refresh cookie; wire calendar/budget/honeymoon as they mature.
+	•	Tooling/docs: add CI to run backend tests; add Dockerfile/compose for API + Postgres; document envs for prod (DB, SECRET_KEY/JWT, CORS/CSRF, S3).
 
-Work in this order unless a blocker arises: backend skeleton → DB + migrations → auth → core routes → S3 stub → frontend wiring → docs/tooling.
+Work in this order unless a blocker arises: finish seeds + invites → storage (S3) → frontend wiring → comments/activity → deploy scripts/CI.
 
 Progress Update (Current Status)
 
-Backend:
-• Express + TypeScript app scaffolded with shared app factory (`src/app.ts`) and server bootstrap (`src/server.ts`).
-• Auth implemented: signup/login/refresh/logout with bcrypt password hashing, JWT access/refresh, refresh cookie (HTTP-only, SameSite Lax), and envelope `{ data, error }` responses.
-• Events/onboarding: event types endpoint (onboardingOnly excludes engagement), event selection upsert (creates/updates events and moodboard enabled flags, deactivates non-selected), events list for the couple. Engagement is still milestone-only (skipped in onboarding).
-• Calendar: `GET /api/calendar` returns events for the authenticated couple.
-• Moodboard: list/create/delete items (expects existing media_id; storage stub in place). Ownership checks enforced by couple membership.
-• Middleware: JWT requireAuth middleware for protected routes; cookie parsing enabled.
-• Prisma schema aligned with domain (users/couples/events/moodboards/budgets/honeymoon/tasks/comments/activity/notifications); comments use polymorphic `target_type/target_id` scalars. Event type seeds include engagement (milestone-only) and the 5 active onboarding events.
-• Tests: Vitest + Supertest with DB reset/seed helpers; coverage for auth, events selection, calendar, and moodboard flows. Tests require a running Postgres test DB and wipe/seed it each run.
-• Storage: placeholder S3/local stub pending real integration.
+Backend (Django/DRF):
+• Stack: Django 4.2 + DRF + SimpleJWT; custom User (email login), Couple/CoupleMember, EventType/Event, Media/Moodboard, Budget/Honeymoon models in place.
+• Auth: signup/login/refresh/logout with access/refresh tokens; refresh cookie HTTP-only SameSite Lax. Invites/acceptance not implemented yet (dev seed helper used).
+• Events: event types endpoint (onboardingOnly excludes engagement), event selection upsert (creates/updates events + moodboard enabled flags, deactivates unselected non-engagement), events list, calendar read.
+• Media/Moodboard: local upload (FileSystemStorage) + moodboard list/create/delete (couple ownership enforced).
+• Budget: event budget create/read (with optional category attach), add line items.
+• Honeymoon: plan upsert and item create.
+• Tests: Django TestCase/DRF APITest; coverage for auth, event types/selection, calendar, moodboard CRUD, budget, honeymoon. All tests passing.
+• Dev helper: `python manage.py seed_dev_couple --email you@example.com --event-key wedding_night` seeds couple/membership/event for a user.
+• E2E script: `python scripts/e2e_flow.py` exercises signup/login, selection, calendar, upload, moodboard, budget (assumes category id=1), honeymoon.
 
 Frontend:
 • Still using static data; no API wiring yet. UI updated to exclude engagement from onboarding/gallery/budgets, moodboard toggles, and calendar legend includes engagement as milestone-only.
 
 Next Steps (Recommended)
-• Replace static frontend calls with real API client (base `/api`, handle refresh cookie + access token).
-• Add budget endpoints (list/update event budgets, categories, line items) and honeymoon CRUD; wire calendar/moodboard to uploads when storage is ready.
-• Implement media upload (S3 client + local dev adapter) and add a media creation endpoint for moodboards.
-• Extend tests for budgets/honeymoon/comments/activity; add seed helpers for media to simplify moodboard tests.
-• Update README/AGENTS with backend run/test instructions and Postman/Vitest notes; add Dockerfiles for FE/BE if desired.
-• Keep Engagement as calendar-only unless requirements change; ensure filters/onboarding continue to exclude it.
+• Frontend integration: replace static onboarding/moodboard with live API calls; handle auth/refresh; use event selection/calendar endpoints.
+• Seeds: add data migration/command for event_types and budget_categories; update e2e script to auto-create a venue category if missing.
+• Storage: add S3 (django-storages + boto3) for prod; keep local for dev; document env vars.
+• Invites: implement invite/accept flow to replace the dev seeding helper.
+• Comments/activity: add endpoints to match the schema; extend tests.
+• Deployment: add Dockerfile + CI (run `python manage.py test`); document envs for prod (DB, JWT/SECRET_KEY, CORS/CSRF hosts, S3).
 
 You can work incrementally, but keep everything consistent and production-minded.
 
@@ -379,3 +378,39 @@ Repo structure notes / optimizations
 • Git on synced folders may block index.lock creation. Keeping the repo under ~/repos (or any non-synced path) avoids permission issues.
 • Frontend still points to static data; plan a switch-over to the Django API once endpoints reach parity.
 • Node backend has been removed; Django is the primary backend going forward.
+
+⸻
+
+Current Backend Status (Django)
+• Stack: Django 4.2 + DRF + SimpleJWT; custom User, Couple/CoupleMember, EventType/Event, Media/Moodboard (+items/reactions), Budget, and Honeymoon models.
+• Auth: signup/login/refresh/logout with refresh cookie (HTTP-only, SameSite Lax). Invites/acceptance not implemented yet (use dev seed helper).
+• Events: event types (onboardingOnly excludes engagement), event selection upsert (creates/updates events + moodboard flags, deactivates unselected non-engagement), events list, calendar.
+• Media/Moodboard: local upload (FileSystemStorage) + moodboard list/create/delete with couple ownership checks.
+• Budget: event budget create/read (attach category), add line items.
+• Honeymoon: plan upsert and item create.
+• Tests: Django APITest coverage for auth, events selection/types, calendar, moodboard CRUD, budget, honeymoon (all passing).
+• Dev helper: `python manage.py seed_dev_couple --email you@example.com --event-key wedding_night` to create couple/membership/event.
+• E2E script: `BASE_URL=http://127.0.0.1:4000 python scripts/e2e_flow.py` (assumes budget category id=1 exists).
+
+Django backend quickstart
+• Location: backend (Poetry/venv managed).
+• Env sample (.env): SECRET_KEY=dev, DEBUG=true, DATABASE_URL=sqlite:///db.sqlite3, ALLOWED_HOSTS=localhost,127.0.0.1,testserver, CORS_ALLOWED_ORIGINS=http://localhost:5173, CSRF_TRUSTED_ORIGINS=http://localhost:5173
+• Commands:
+  - Migrate: `python manage.py migrate`
+  - Run: `python manage.py runserver 0.0.0.0:4000`
+  - Tests: `python manage.py test`
+• Key endpoints:
+  - /api/health/
+  - /api/auth/signup, /api/auth/login, /api/auth/refresh, /api/auth/logout
+  - /api/events/types/, /api/events/selection/, /api/events/, /api/calendar/
+  - /api/media/upload/, /api/moodboard/<event_id>/ (GET/POST), /api/moodboard/items/<item_id>/ (DELETE)
+  - /api/events/<event_id>/budget/, /api/budget/categories/<category_id>/items/
+  - /api/events/<event_id>/honeymoon/, /api/honeymoon/<plan_id>/items/
+
+Next Steps
+• Frontend: replace static onboarding/moodboard with live API calls; handle auth/refresh; use calendar endpoints; surface budget/honeymoon as ready.
+• Seeds: add data migration/command for event_types and budget_categories; make e2e script auto-create a default category if missing.
+• Storage: add S3 via django-storages + boto3 for prod; keep local for dev; document env vars.
+• Invites: implement invite/accept flow to replace the dev seeding helper.
+• Comments/activity: add endpoints/tests to match the schema.
+• Deployment: add Dockerfile/CI (run backend tests), document prod envs (DB, SECRET_KEY/JWT, CORS/CSRF, S3).
