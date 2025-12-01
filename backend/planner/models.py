@@ -114,4 +114,76 @@ class MoodBoardReaction(models.Model):
     class Meta:
         unique_together = ("mood_board_item", "user", "reaction_type")
 
+
+class EventBudget(models.Model):
+    event = models.OneToOneField(Event, on_delete=models.CASCADE, related_name="event_budget")
+    currency_code = models.CharField(max_length=8, default="USD")
+    total_planned = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_spent = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class BudgetCategory(models.Model):
+    key = models.CharField(max_length=50, unique=True)
+    label = models.CharField(max_length=100)
+    sort_order = models.IntegerField(default=0)
+    is_default_for_omani = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.label
+
+
+class EventBudgetCategory(models.Model):
+    event_budget = models.ForeignKey(EventBudget, on_delete=models.CASCADE, related_name="categories")
+    category = models.ForeignKey(BudgetCategory, on_delete=models.PROTECT)
+    planned_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    spent_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+
+class BudgetLineItem(models.Model):
+    event_budget_category = models.ForeignKey(EventBudgetCategory, on_delete=models.CASCADE, related_name="line_items")
+    label = models.CharField(max_length=255)
+    planned_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    actual_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    notes = models.TextField(blank=True)
+    paid_on = models.DateField(null=True, blank=True)
+    receipt_media = models.ForeignKey(MediaFile, on_delete=models.SET_NULL, null=True, blank=True, related_name="receipts")
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="budget_line_items")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class HoneymoonPlan(models.Model):
+    event = models.OneToOneField(Event, on_delete=models.CASCADE, related_name="honeymoon_plan")
+    destination_country = models.CharField(max_length=100, blank=True)
+    destination_city = models.CharField(max_length=100, blank=True)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+    total_planned = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_spent = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class HoneymoonItem(models.Model):
+    TYPE_CHOICES = (
+        ("flight", "Flight"),
+        ("hotel", "Hotel"),
+        ("activity", "Activity"),
+        ("other", "Other"),
+    )
+    honeymoon_plan = models.ForeignKey(HoneymoonPlan, on_delete=models.CASCADE, related_name="items")
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES, default="other")
+    label = models.CharField(max_length=255)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    planned_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    actual_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    provider_name = models.CharField(max_length=255, blank=True)
+    booking_ref = models.CharField(max_length=255, blank=True)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
 # Create your models here.

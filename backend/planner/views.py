@@ -7,8 +7,32 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 
-from .models import CoupleMember, Event, MediaFile, MoodBoard, MoodBoardItem, EventType
-from .serializers import MediaFileSerializer, MoodBoardSerializer, MoodBoardItemSerializer, EventTypeSerializer, EventSerializer
+from .models import (
+    CoupleMember,
+    Event,
+    MediaFile,
+    MoodBoard,
+    MoodBoardItem,
+    EventType,
+    EventBudget,
+    EventBudgetCategory,
+    BudgetCategory,
+    BudgetLineItem,
+    HoneymoonPlan,
+    HoneymoonItem,
+)
+from .serializers import (
+    MediaFileSerializer,
+    MoodBoardSerializer,
+    MoodBoardItemSerializer,
+    EventTypeSerializer,
+    EventSerializer,
+    EventBudgetSerializer,
+    EventBudgetCategorySerializer,
+    BudgetLineItemSerializer,
+    HoneymoonPlanSerializer,
+    HoneymoonItemSerializer,
+)
 
 
 def _active_couple_id(user_id):
@@ -120,6 +144,101 @@ class CalendarView(views.APIView):
             for e in events
         ]
         return Response({"data": data, "error": None})
+
+
+class EventBudgetView(views.APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, event_id):
+        couple_id = _active_couple_id(request.user.id)
+        if not couple_id:
+            return Response({"data": None, "error": "No active couple membership"}, status=404)
+        event = get_object_or_404(Event.objects.filter(id=event_id, couple_id=couple_id))
+        budget, _ = EventBudget.objects.get_or_create(event=event)
+        budget = EventBudget.objects.prefetch_related("categories__line_items").get(id=budget.id)
+        return Response({"data": EventBudgetSerializer(budget).data, "error": None})
+
+    def post(self, request, event_id):
+        couple_id = _active_couple_id(request.user.id)
+        if not couple_id:
+            return Response({"data": None, "error": "No active couple membership"}, status=404)
+        event = get_object_or_404(Event.objects.filter(id=event_id, couple_id=couple_id))
+        budget, _ = EventBudget.objects.get_or_create(event=event)
+
+        # Attach category (optional)
+        category_id = request.data.get("category_id")
+        if category_id:
+            category = get_object_or_404(BudgetCategory, id=category_id)
+            EventBudgetCategory.objects.get_or_create(event_budget=budget, category=category)
+
+        budget.refresh_from_db()
+        budget = EventBudget.objects.prefetch_related("categories__line_items").get(id=budget.id)
+        return Response({"data": EventBudgetSerializer(budget).data, "error": None}, status=201)
+
+
+class EventBudgetCategoryItemsView(views.APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, category_id):
+        couple_id = _active_couple_id(request.user.id)
+        if not couple_id:
+            return Response({"data": None, "error": "No active couple membership"}, status=404)
+        cat = get_object_or_404(
+            EventBudgetCategory.objects.select_related("event_budget__event"),
+            id=category_id,
+        )
+        if cat.event_budget.event.couple_id != couple_id:
+            return Response({"data": None, "error": "Not found"}, status=404)
+
+        serializer = BudgetLineItemSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        item = serializer.save(event_budget_category=cat, created_by=request.user)
+        return Response({"data": BudgetLineItemSerializer(item).data, "error": None}, status=201)
+
+
+class HoneymoonPlanView(views.APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, event_id):
+        couple_id = _active_couple_id(request.user.id)
+        if not couple_id:
+            return Response({"data": None, "error": "No active couple membership"}, status=404)
+        event = get_object_or_404(Event.objects.filter(id=event_id, couple_id=couple_id))
+        plan, _ = HoneymoonPlan.objects.get_or_create(event=event)
+        plan = HoneymoonPlan.objects.prefetch_related("items").get(id=plan.id)
+        return Response({"data": HoneymoonPlanSerializer(plan).data, "error": None})
+
+    def post(self, request, event_id):
+        couple_id = _active_couple_id(request.user.id)
+        if not couple_id:
+            return Response({"data": None, "error": "No active couple membership"}, status=404)
+        event = get_object_or_404(Event.objects.filter(id=event_id, couple_id=couple_id))
+        plan, _ = HoneymoonPlan.objects.get_or_create(event=event)
+        serializer = HoneymoonPlanSerializer(plan, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        plan = HoneymoonPlan.objects.prefetch_related("items").get(id=plan.id)
+        return Response({"data": HoneymoonPlanSerializer(plan).data, "error": None})
+
+
+class HoneymoonItemView(views.APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, plan_id):
+        couple_id = _active_couple_id(request.user.id)
+        if not couple_id:
+            return Response({"data": None, "error": "No active couple membership"}, status=404)
+        plan = get_object_or_404(HoneymoonPlan.objects.select_related("event"), id=plan_id)
+        if plan.event.couple_id != couple_id:
+            return Response({"data": None, "error": "Not found"}, status=404)
+        serializer = HoneymoonItemSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        item = serializer.save(honeymoon_plan=plan)
+        return Response({"data": HoneymoonItemSerializer(item).data, "error": None}, status=201)
 
 
 class MediaUploadView(views.APIView):

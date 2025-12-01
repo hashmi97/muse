@@ -7,7 +7,20 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import AccessToken
 from accounts.models import User
-from .models import Couple, CoupleMember, EventType, Event, MoodBoardItem, MediaFile
+from .models import (
+    Couple,
+    CoupleMember,
+    EventType,
+    Event,
+    MoodBoardItem,
+    MediaFile,
+    EventBudgetCategory,
+    BudgetLineItem,
+    HoneymoonPlan,
+    HoneymoonItem,
+    BudgetCategory,
+)
+from django.conf import settings
 
 
 class PlannerPingTests(APITestCase):
@@ -70,12 +83,14 @@ class MoodboardFlowTests(APITestCase):
 
 class EventSelectionTests(APITestCase):
     def setUp(self):
+        if 'testserver' not in settings.ALLOWED_HOSTS:
+            settings.ALLOWED_HOSTS.append('testserver')
         self.user = User.objects.create_user(email="user2@example.com", password="password123")
         self.couple = Couple.objects.create(name="Couple Two")
         CoupleMember.objects.create(couple=self.couple, user=self.user, status="active", role="groom", is_owner=True)
         # seed types
-        self.eng = EventType.objects.create(key="engagement", name_en="Engagement")
-        self.wed = EventType.objects.create(key="wedding_night", name_en="Wedding Night")
+        self.eng, _ = EventType.objects.get_or_create(key="engagement", defaults={"name_en": "Engagement"})
+        self.wed, _ = EventType.objects.get_or_create(key="wedding_night", defaults={"name_en": "Wedding Night"})
         token = AccessToken.for_user(self.user)
         self.auth = {"HTTP_AUTHORIZATION": f"Bearer {str(token)}"}
 
@@ -94,3 +109,58 @@ class EventSelectionTests(APITestCase):
         self.assertEqual(len(data), 1)
         self.assertEqual(data[0]["event_type"]["key"], "wedding_night")
         self.assertTrue(Event.objects.filter(couple=self.couple, event_type=self.wed, is_active=True).exists())
+
+
+class BudgetAndHoneymoonTests(APITestCase):
+    def setUp(self):
+        if 'testserver' not in settings.ALLOWED_HOSTS:
+            settings.ALLOWED_HOSTS.append('testserver')
+        self.user = User.objects.create_user(email="user3@example.com", password="password123")
+        self.couple = Couple.objects.create(name="Couple Three")
+        CoupleMember.objects.create(couple=self.couple, user=self.user, status="active", role="groom", is_owner=True)
+        self.wed, _ = EventType.objects.get_or_create(key="wedding_night", defaults={"name_en": "Wedding Night"})
+        self.event = Event.objects.create(couple=self.couple, event_type=self.wed, title="Wedding Night")
+        token = AccessToken.for_user(self.user)
+        self.auth = {"HTTP_AUTHORIZATION": f"Bearer {str(token)}"}
+
+    def test_budget_flow(self):
+        # create budget and attach category
+        cat = BudgetCategory.objects.create(key="venue", label="Venue")
+        res = self.client.post(
+            f"/api/events/{self.event.id}/budget/",
+            {"category_id": cat.id},
+            **self.auth,
+        )
+        if res.status_code != status.HTTP_201_CREATED:
+            self.fail(f"Budget create failed: {res.status_code} {res.content}")
+        data = res.json()["data"]
+        self.assertEqual(data["event"], self.event.id)
+        # find category id
+        budget_cat_id = data["categories"][0]["id"]
+        # add line item
+        res = self.client.post(
+            f"/api/budget/categories/{budget_cat_id}/items/",
+            {"label": "Hall", "planned_amount": "1000.00"},
+            **self.auth,
+        )
+        if res.status_code != status.HTTP_201_CREATED:
+            self.fail(f"Line item create failed: {res.status_code} {res.content}")
+        self.assertTrue(BudgetLineItem.objects.filter(label="Hall").exists())
+
+    def test_honeymoon_flow(self):
+        res = self.client.post(
+            f"/api/events/{self.event.id}/honeymoon/",
+            {"destination_country": "OM", "destination_city": "Muscat"},
+            **self.auth,
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        plan_id = res.json()["data"]["id"]
+        self.assertTrue(HoneymoonPlan.objects.filter(id=plan_id).exists())
+
+        res = self.client.post(
+            f"/api/honeymoon/{plan_id}/items/",
+            {"type": "flight", "label": "Flight to MCT", "planned_amount": "500.00"},
+            **self.auth,
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(HoneymoonItem.objects.filter(label="Flight to MCT").exists())
