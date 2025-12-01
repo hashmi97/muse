@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import MediaFile, MoodBoardItem, MoodBoardReaction, MoodBoard, Event
+from .models import MediaFile, MoodBoardItem, MoodBoardReaction, MoodBoard, Event, EventType
 
 
 class MediaFileSerializer(serializers.ModelSerializer):
@@ -26,3 +26,25 @@ class MoodBoardSerializer(serializers.ModelSerializer):
         model = MoodBoard
         fields = ("id", "event", "is_enabled", "items")
         read_only_fields = ("id", "event", "items")
+
+
+class EventTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EventType
+        fields = ("id", "key", "name_en", "name_ar", "default_color_hex", "default_moodboard_enabled")
+
+
+class EventSerializer(serializers.ModelSerializer):
+    event_type = EventTypeSerializer(read_only=True)
+
+    class Meta:
+        model = Event
+        fields = (
+            "id",
+            "event_type",
+            "title",
+            "description",
+            "start_date",
+            "end_date",
+            "is_active",
+        )

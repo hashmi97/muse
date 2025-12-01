@@ -7,8 +7,8 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 
-from .models import CoupleMember, Event, MediaFile, MoodBoard, MoodBoardItem
-from .serializers import MediaFileSerializer, MoodBoardSerializer, MoodBoardItemSerializer
+from .models import CoupleMember, Event, MediaFile, MoodBoard, MoodBoardItem, EventType
+from .serializers import MediaFileSerializer, MoodBoardSerializer, MoodBoardItemSerializer, EventTypeSerializer, EventSerializer
 
 
 def _active_couple_id(user_id):
@@ -21,6 +21,105 @@ class PlannerPingView(views.APIView):
 
     def get(self, request):
         return Response({"data": {"status": "ok"}, "error": None})
+
+
+class EventTypesView(views.APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        onboarding_only = request.query_params.get("onboardingOnly") in ("true", "1", "yes")
+        qs = EventType.objects.all()
+        if onboarding_only:
+            qs = qs.exclude(key="engagement")
+        data = EventTypeSerializer(qs, many=True).data
+        return Response({"data": data, "error": None})
+
+
+class EventsListView(views.APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        couple_id = _active_couple_id(request.user.id)
+        if not couple_id:
+            return Response({"data": [], "error": None})
+        events = Event.objects.filter(couple_id=couple_id, is_active=True).select_related("event_type")
+        return Response({"data": EventSerializer(events, many=True).data, "error": None})
+
+
+class EventSelectionView(views.APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        """
+        Body: { selections: [{ eventTypeKey: string, title?: string, enableMoodboard?: bool }] }
+        Engagement is ignored for onboarding (calendar-only).
+        """
+        user = request.user
+        couple_id = _active_couple_id(user.id)
+        if not couple_id:
+            return Response({"data": None, "error": "No active couple membership"}, status=404)
+
+        selections = request.data.get("selections", [])
+        if not isinstance(selections, list):
+            return Response({"data": None, "error": "selections must be a list"}, status=400)
+
+        types_by_key = {et.key: et for et in EventType.objects.all()}
+        keep_ids = []
+
+        for sel in selections:
+            key = sel.get("eventTypeKey")
+            if not key:
+                continue
+            if key == "engagement":
+                continue  # milestone-only
+            et = types_by_key.get(key)
+            if not et:
+                continue
+            title = sel.get("title") or et.name_en
+            enable_mb = sel.get("enableMoodboard", et.default_moodboard_enabled)
+            evt, _ = Event.objects.update_or_create(
+                couple_id=couple_id,
+                event_type=et,
+                defaults={"title": title, "is_active": True},
+            )
+            keep_ids.append(evt.id)
+            MoodBoard.objects.update_or_create(
+                event=evt,
+                defaults={"is_enabled": bool(enable_mb)},
+            )
+
+        # Deactivate unselected events (except engagement)
+        Event.objects.filter(couple_id=couple_id).exclude(event_type__key="engagement").exclude(id__in=keep_ids).update(
+            is_active=False
+        )
+
+        events = Event.objects.filter(couple_id=couple_id, is_active=True).select_related("event_type")
+        return Response({"data": EventSerializer(events, many=True).data, "error": None})
+
+
+class CalendarView(views.APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        couple_id = _active_couple_id(request.user.id)
+        if not couple_id:
+            return Response({"data": [], "error": None})
+        events = Event.objects.filter(couple_id=couple_id, is_active=True).select_related("event_type")
+        data = [
+            {
+                "id": e.id,
+                "title": e.title or e.event_type.name_en,
+                "event_type": e.event_type.key,
+                "start_date": e.start_date,
+                "end_date": e.end_date,
+            }
+            for e in events
+        ]
+        return Response({"data": data, "error": None})
 
 
 class MediaUploadView(views.APIView):

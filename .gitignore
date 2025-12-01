@@ -21,4 +21,18 @@ build
 coverage
 *.log
 
-.venv
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+
+# Virtual environments
+.env
+.venv/
+*/.venv/
+env/
+env.bak/
+
+# Django local files
+db.sqlite3
+/media/

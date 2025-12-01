@@ -66,3 +66,31 @@ class MoodboardFlowTests(APITestCase):
         res = self.client.delete(f"/api/moodboard/items/{item_id}/", **self.auth)
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertFalse(MoodBoardItem.objects.filter(id=item_id).exists())
+
+
+class EventSelectionTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(email="user2@example.com", password="password123")
+        self.couple = Couple.objects.create(name="Couple Two")
+        CoupleMember.objects.create(couple=self.couple, user=self.user, status="active", role="groom", is_owner=True)
+        # seed types
+        self.eng = EventType.objects.create(key="engagement", name_en="Engagement")
+        self.wed = EventType.objects.create(key="wedding_night", name_en="Wedding Night")
+        token = AccessToken.for_user(self.user)
+        self.auth = {"HTTP_AUTHORIZATION": f"Bearer {str(token)}"}
+
+    def test_event_types_exclude_engagement(self):
+        res = self.client.get("/api/events/types/?onboardingOnly=true", **self.auth)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        keys = [et["key"] for et in res.json()["data"]]
+        self.assertNotIn("engagement", keys)
+        self.assertIn("wedding_night", keys)
+
+    def test_selection_upsert(self):
+        body = {"selections": [{"eventTypeKey": "wedding_night", "title": "Our Wedding", "enableMoodboard": True}]}
+        res = self.client.post("/api/events/selection/", body, format="json", **self.auth)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        data = res.json()["data"]
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["event_type"]["key"], "wedding_night")
+        self.assertTrue(Event.objects.filter(couple=self.couple, event_type=self.wed, is_active=True).exists())
