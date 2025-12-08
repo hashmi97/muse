@@ -4,7 +4,7 @@ This file reflects the current implementation (Django backend + React frontend) 
 
 ## High-Level Status
 - **Backend**: Django 4.2 + DRF + SimpleJWT. Endpoints implemented for auth, couples, event selection, calendar, media upload, moodboard CRUD, budget, honeymoon, comments, activity logs, tasks, notifications, and dashboard summary. Auto-generated API docs via drf-spectacular (Swagger/Redoc).
-- **Frontend**: React (Vite/TS). Signup/onboarding wired to the backend auth and event-selection APIs; other pages still mostly static and need wiring to live data.
+- **Frontend**: React (Vite/TS). All pages fully integrated with backend APIs. Calendar, Event Page (all tabs), Budget Planner, Honeymoon Planner, Activity Feed, and Gallery all display real data and support CRUD operations.
 - **Database**: PostgreSQL via Docker Compose (development and production parity). Schema covers users, couples/members/invites, events/types, media/moodboards, budget, honeymoon, comments, activity logs, tasks, notifications. Soft-delete implemented for comments, budget items, events, honeymoon items, and moodboard items.
 - **Invites**: Signup creates a couple, adds the signer as owner, creates/invites partner; partner user is auto-provisioned with a temp password and emailed. Partner account activates on first login; users can change passwords.
 
@@ -56,7 +56,17 @@ This file reflects the current implementation (Django backend + React frontend) 
 ## Frontend Status
 - Stack: Vite + React + TS. Global styles, romantic/rose palette, Playfair-style headings.
 - Auth/Onboarding: Signup/login wired to backend; onboarding loads event types from API and posts selection.
-- Other pages (dashboard/calendar/budget/moodboard/etc.) still mostly static — need wiring to backend endpoints.
+- **Calendar**: Fully integrated - fetches events from `/api/calendar/`, month navigation, event click navigation, loading/error states.
+- **Event Page**: All tabs integrated:
+  - Overview: Displays real event data and stats (budget, tasks, moodboard counts)
+  - Budget: Full CRUD for budget categories and line items
+  - Tasks: Create, toggle completion, delete tasks
+  - Moodboard: Upload images, display grid, delete items
+  - Notes: Displays event description (save requires backend PATCH endpoint)
+- **Budget Planner**: Fetches all event budgets, displays totals and category breakdowns, links to event budget management.
+- **Honeymoon Planner**: Full CRUD for honeymoon plans and items (flights, hotels, activities, misc).
+- **Activity Feed**: Displays activity logs with formatting, relative timestamps, and links to events.
+- **Gallery**: Aggregates all moodboard items across events with event-type filtering.
 - Config: Set `VITE_API_URL` (e.g., `http://127.0.0.1:4000/api`); restart `npm run dev` after changes.
 
 ## Running Locally
@@ -92,7 +102,7 @@ npm run dev   # ensure VITE_API_URL is set in .env (e.g., http://localhost:4000/
 ```
 
 ## Next Steps / Gaps
-- Frontend: Wire dashboard/calendar/event pages, budgets, honeymoon, media/moodboards, comments, tasks, notifications to the live API; add invite acceptance flow UI; show server validation errors consistently.
-- Backend: Add S3 storage option for media files; enhance collaboration features (rich text comments, task dependencies, notification preferences); add CI/CD pipeline.
+- Frontend: Add invite acceptance flow UI; integrate comments system UI; show server validation errors consistently; add event update endpoint for Notes tab save functionality.
+- Backend: Add S3 storage option for media files; add PATCH endpoint for event updates (for Notes tab); enhance collaboration features (rich text comments, task dependencies, notification preferences); add CI/CD pipeline.
 - Auth: Consider email verification; improve invite email templates and acceptance link flow.
 - Data: All models now use soft-delete where appropriate; PostgreSQL is the default via Docker Compose.

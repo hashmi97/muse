@@ -1,86 +1,92 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navigation } from '../components/Navigation';
-import { Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { fetchAllEvents, fetchEventBudget, type ApiEvent, type EventBudget } from '../lib/api';
 
-const budgetData = {
-  malka: {
-    name: 'Malka',
-    color: 'from-rose-200 to-rose-300',
-    total: 8000,
-    spent: 6500,
-    categories: [
-      { name: 'Venue', planned: 3000, spent: 3000 },
-      { name: 'Catering', planned: 3500, spent: 2500 },
-      { name: 'Decor', planned: 1000, spent: 800 },
-      { name: 'Photography', planned: 500, spent: 200 },
-    ],
-  },
-  henna: {
-    name: 'Henna Night',
-    color: 'from-peach-200 to-rose-200',
-    total: 5000,
-    spent: 3200,
-    categories: [
-      { name: 'Venue', planned: 2000, spent: 2000 },
-      { name: 'Henna Artist', planned: 800, spent: 800 },
-      { name: 'Decor', planned: 1200, spent: 400 },
-      { name: 'Entertainment', planned: 1000, spent: 0 },
-    ],
-  },
-  wedding: {
-    name: 'Wedding Night',
-    color: 'from-rose-300 to-rose-400',
-    total: 25000,
-    spent: 15000,
-    categories: [
-      { name: 'Venue', planned: 10000, spent: 10000 },
-      { name: 'Catering', planned: 8000, spent: 4000 },
-      { name: 'Photography', planned: 3000, spent: 1000 },
-      { name: 'Decor', planned: 2500, spent: 0 },
-      { name: 'Music/DJ', planned: 1500, spent: 0 },
-    ],
-  },
-  bridePrep: {
-    name: 'Bride Preparation',
-    color: 'from-peach-100 to-peach-200',
-    total: 3000,
-    spent: 1800,
-    categories: [
-      { name: 'Dress', planned: 1500, spent: 1500 },
-      { name: 'Makeup', planned: 500, spent: 300 },
-      { name: 'Hair', planned: 400, spent: 0 },
-      { name: 'Accessories', planned: 600, spent: 0 },
-    ],
-  },
-  honeymoon: {
-    name: 'Honeymoon',
-    color: 'from-rose-100 to-peach-200',
-    total: 4000,
-    spent: 1000,
-    categories: [
-      { name: 'Flights', planned: 1500, spent: 1000 },
-      { name: 'Accommodation', planned: 1800, spent: 0 },
-      { name: 'Activities', planned: 500, spent: 0 },
-      { name: 'Food & Dining', planned: 200, spent: 0 },
-    ],
-  },
+const eventColors: Record<string, string> = {
+  malka: 'from-rose-200 to-rose-300',
+  henna_night: 'from-peach-200 to-rose-200',
+  bride_preparation: 'from-peach-100 to-peach-200',
+  wedding_night: 'from-rose-300 to-rose-400',
+  honeymoon: 'from-rose-100 to-peach-200',
 };
 
+type EventBudgetData = {
+  event: ApiEvent;
+  budget: EventBudget | null;
+  loading: boolean;
+};
+
+function formatCurrency(amount: string | number): string {
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  return `$${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 export function BudgetPlanner() {
-  const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set(['wedding']));
-  
-  const toggleEvent = (eventKey: string) => {
+  const { accessToken, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const [expandedEvents, setExpandedEvents] = useState<Set<number>>(new Set());
+  const [events, setEvents] = useState<ApiEvent[]>([]);
+  const [eventBudgets, setEventBudgets] = useState<Map<number, EventBudgetData>>(new Map());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!accessToken) {
+      navigate('/signup');
+      return;
+    }
+
+    async function loadData() {
+      try {
+        setLoading(true);
+        setError(null);
+        const eventsData = await fetchAllEvents(accessToken);
+        setEvents(eventsData);
+
+        // Load budgets for all events
+        const budgetsMap = new Map<number, EventBudgetData>();
+        for (const event of eventsData) {
+          budgetsMap.set(event.id, { event, budget: null, loading: true });
+          try {
+            const budget = await fetchEventBudget(accessToken, event.id);
+            budgetsMap.set(event.id, { event, budget, loading: false });
+          } catch (err) {
+            budgetsMap.set(event.id, { event, budget: null, loading: false });
+          }
+        }
+        setEventBudgets(budgetsMap);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load budget data');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadData();
+  }, [accessToken, authLoading, navigate]);
+
+  const toggleEvent = (eventId: number) => {
     const newExpanded = new Set(expandedEvents);
-    if (newExpanded.has(eventKey)) {
-      newExpanded.delete(eventKey);
+    if (newExpanded.has(eventId)) {
+      newExpanded.delete(eventId);
     } else {
-      newExpanded.add(eventKey);
+      newExpanded.add(eventId);
     }
     setExpandedEvents(newExpanded);
   };
-  
-  const totalPlanned = Object.values(budgetData).reduce((sum, event) => sum + event.total, 0);
-  const totalSpent = Object.values(budgetData).reduce((sum, event) => sum + event.spent, 0);
+
+  const totalPlanned = Array.from(eventBudgets.values()).reduce(
+    (sum, data) => sum + (data.budget ? parseFloat(data.budget.total_planned) : 0),
+    0
+  );
+  const totalSpent = Array.from(eventBudgets.values()).reduce(
+    (sum, data) => sum + (data.budget ? parseFloat(data.budget.total_spent) : 0),
+    0
+  );
   
   return (
     <div className="min-h-screen bg-grey-50">
@@ -94,93 +100,143 @@ export function BudgetPlanner() {
         <div className="grid grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-2xl p-6 shadow-soft">
             <div className="text-grey-600 mb-2">Total Planned</div>
-            <div className="text-3xl text-grey-800">${totalPlanned.toLocaleString()}</div>
+            <div className="text-3xl text-grey-800">{formatCurrency(totalPlanned)}</div>
           </div>
           <div className="bg-white rounded-2xl p-6 shadow-soft">
             <div className="text-grey-600 mb-2">Total Spent</div>
-            <div className="text-3xl text-rose-300">${totalSpent.toLocaleString()}</div>
+            <div className="text-3xl text-rose-300">{formatCurrency(totalSpent)}</div>
           </div>
           <div className="bg-white rounded-2xl p-6 shadow-soft">
             <div className="text-grey-600 mb-2">Remaining</div>
-            <div className="text-3xl text-grey-800">${(totalPlanned - totalSpent).toLocaleString()}</div>
+            <div className="text-3xl text-grey-800">{formatCurrency(totalPlanned - totalSpent)}</div>
           </div>
         </div>
-        
-        {/* Event Budget Cards */}
-        <div className="space-y-6">
-          {Object.entries(budgetData).map(([key, event]) => {
-            const isExpanded = expandedEvents.has(key);
-            const percentSpent = (event.spent / event.total) * 100;
-            
-            return (
-              <div key={key} className="bg-white rounded-2xl shadow-soft overflow-hidden">
-                {/* Event Header */}
-                <button
-                  onClick={() => toggleEvent(key)}
-                  className="w-full p-6 flex items-center justify-between hover:bg-grey-50 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${event.color}`} />
-                    <div className="text-left">
-                      <h3 className="text-xl" style={{ fontFamily: 'Playfair Display, serif' }}>{event.name}</h3>
-                      <div className="text-sm text-grey-500">
-                        ${event.spent.toLocaleString()} of ${event.total.toLocaleString()} spent
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-6">
-                    <div className="w-48">
-                      <div className="h-2 bg-grey-100 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full bg-gradient-to-r ${event.color} rounded-full transition-all`}
-                          style={{ width: `${percentSpent}%` }}
-                        />
-                      </div>
-                    </div>
-                    {isExpanded ? (
-                      <ChevronUp className="w-5 h-5 text-grey-400" />
-                    ) : (
-                      <ChevronDown className="w-5 h-5 text-grey-400" />
-                    )}
-                  </div>
-                </button>
-                
-                {/* Expanded Categories */}
-                {isExpanded && (
-                  <div className="border-t border-grey-100 p-6">
-                    <div className="space-y-4">
-                      {event.categories.map((category, idx) => (
-                        <div key={idx} className="flex items-center justify-between py-3 border-b border-grey-50 last:border-0">
-                          <div className="flex-1">
-                            <div className="text-grey-800">{category.name}</div>
-                          </div>
-                          <div className="flex items-center gap-8">
-                            <div className="text-right">
-                              <div className="text-sm text-grey-500">Planned</div>
-                              <div className="text-grey-700">${category.planned.toLocaleString()}</div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-sm text-grey-500">Spent</div>
-                              <div className="text-rose-300">${category.spent.toLocaleString()}</div>
-                            </div>
-                            <div className="text-right w-24">
-                              <div className="text-sm text-grey-500">Remaining</div>
-                              <div className="text-grey-700">${(category.planned - category.spent).toLocaleString()}</div>
-                            </div>
-                          </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-8 h-8 text-rose-300 animate-spin" />
+          </div>
+        ) : error ? (
+          <div className="bg-white rounded-2xl p-8 shadow-soft text-center">
+            <p className="text-grey-600">{error}</p>
+          </div>
+        ) : events.length === 0 ? (
+          <div className="bg-white rounded-2xl p-8 shadow-soft text-center">
+            <p className="text-grey-600">No events found. Create events in onboarding first.</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {events.map((event) => {
+              const budgetData = eventBudgets.get(event.id);
+              const isExpanded = expandedEvents.has(event.id);
+              const budget = budgetData?.budget;
+              const eventTotal = budget ? parseFloat(budget.total_planned) : 0;
+              const eventSpent = budget ? parseFloat(budget.total_spent) : 0;
+              const percentSpent = eventTotal > 0 ? (eventSpent / eventTotal) * 100 : 0;
+              const eventColor = eventColors[event.event_type.key] || 'from-grey-200 to-grey-300';
+              const eventName = event.title || event.event_type.name_en;
+
+              return (
+                <div key={event.id} className="bg-white rounded-2xl shadow-soft overflow-hidden">
+                  <button
+                    onClick={() => toggleEvent(event.id)}
+                    className="w-full p-6 flex items-center justify-between hover:bg-grey-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${eventColor}`} />
+                      <div className="text-left">
+                        <h3 className="text-xl" style={{ fontFamily: 'Playfair Display, serif' }}>
+                          {eventName}
+                        </h3>
+                        <div className="text-sm text-grey-500">
+                          {formatCurrency(eventSpent)} of {formatCurrency(eventTotal)} spent
                         </div>
-                      ))}
+                      </div>
                     </div>
-                    <button className="mt-6 w-full py-3 border-2 border-dashed border-grey-200 rounded-xl hover:border-grey-300 hover:bg-grey-50 transition-all flex items-center justify-center gap-2 text-grey-600">
-                      <Plus className="w-4 h-4" />
-                      Add Line Item
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                    <div className="flex items-center gap-6">
+                      <div className="w-48">
+                        <div className="h-2 bg-grey-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full bg-gradient-to-r ${eventColor} rounded-full transition-all`}
+                            style={{ width: `${Math.min(100, percentSpent)}%` }}
+                          />
+                        </div>
+                      </div>
+                      {isExpanded ? (
+                        <ChevronUp className="w-5 h-5 text-grey-400" />
+                      ) : (
+                        <ChevronDown className="w-5 h-5 text-grey-400" />
+                      )}
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="border-t border-grey-100 p-6">
+                      {budgetData?.loading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="w-6 h-6 text-rose-300 animate-spin" />
+                        </div>
+                      ) : budget && budget.categories.length > 0 ? (
+                        <>
+                          <div className="space-y-4">
+                            {budget.categories.map((category) => {
+                              const catPlanned = parseFloat(category.planned_amount);
+                              const catSpent = parseFloat(category.spent_amount);
+                              return (
+                                <div
+                                  key={category.id}
+                                  className="flex items-center justify-between py-3 border-b border-grey-50 last:border-0"
+                                >
+                                  <div className="flex-1">
+                                    <div className="text-grey-800 font-medium">{category.category.label}</div>
+                                    <div className="text-xs text-grey-500 mt-1">
+                                      {category.line_items.length} item{category.line_items.length !== 1 ? 's' : ''}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-8">
+                                    <div className="text-right">
+                                      <div className="text-sm text-grey-500">Planned</div>
+                                      <div className="text-grey-700">{formatCurrency(catPlanned)}</div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-sm text-grey-500">Spent</div>
+                                      <div className="text-rose-300">{formatCurrency(catSpent)}</div>
+                                    </div>
+                                    <div className="text-right w-24">
+                                      <div className="text-sm text-grey-500">Remaining</div>
+                                      <div className="text-grey-700">{formatCurrency(catPlanned - catSpent)}</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <button
+                            onClick={() => navigate(`/event/${event.id}?tab=budget`)}
+                            className="mt-6 w-full py-3 border-2 border-dashed border-grey-200 rounded-xl hover:border-rose-300 hover:bg-rose-50 transition-all flex items-center justify-center gap-2 text-grey-600 hover:text-rose-300"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Manage Budget
+                          </button>
+                        </>
+                      ) : (
+                        <div className="text-center py-8 text-grey-600">
+                          <p className="mb-4">No budget categories yet.</p>
+                          <button
+                            onClick={() => navigate(`/event/${event.id}?tab=budget`)}
+                            className="px-4 py-2 bg-rose-300 text-white rounded-lg hover:bg-rose-400 transition-colors"
+                          >
+                            Create Budget
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

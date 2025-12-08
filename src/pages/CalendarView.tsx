@@ -1,31 +1,121 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navigation } from '../components/Navigation';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { fetchCalendarEvents, type CalendarEvent } from '../lib/api';
 
 const eventColors: Record<string, string> = {
   malka: 'bg-rose-300',
-  'bride-prep': 'bg-peach-200',
-  henna: 'bg-rose-400',
-  wedding: 'bg-rose-500',
+  henna_night: 'bg-rose-400',
+  bride_preparation: 'bg-peach-200',
+  wedding_night: 'bg-rose-500',
   honeymoon: 'bg-peach-300',
 };
 
-const calendarEvents = [
-  { date: 8, type: 'malka', name: 'Malka Venue Visit' },
-  { date: 15, type: 'malka', name: 'Malka Day' },
-  { date: 20, type: 'bride-prep', name: 'Dress Fitting' },
-  { date: 25, type: 'wedding', name: 'Final Catering Meeting' },
-];
+const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function getMonthYear(date: Date): string {
+  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+function getDaysInMonth(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+}
+
+function getFirstDayOfMonth(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+}
+
+function isToday(date: Date, day: number): boolean {
+  const today = new Date();
+  return (
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    day === today.getDate()
+  );
+}
+
+function formatEventDate(dateString: string | null): string {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 export function CalendarView() {
-  const [currentMonth] = useState('December 2024');
-  const [selectedEvent, setSelectedEvent] = useState<any>(null);
-  
-  const daysInMonth = 31;
-  const firstDayOffset = 4; // December 1, 2024 is a Sunday, but starting on Thursday for display
-  
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  
+  const { accessToken, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!accessToken) {
+      navigate('/signup');
+      return;
+    }
+
+    async function loadEvents() {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await fetchCalendarEvents(accessToken);
+        setEvents(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load calendar events');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadEvents();
+  }, [accessToken, authLoading, navigate]);
+
+  const handlePreviousMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  };
+
+  const handleEventClick = (event: CalendarEvent) => {
+    setSelectedEvent(event);
+  };
+
+  const handleViewEvent = (eventId: number) => {
+    navigate(`/event/${eventId}`);
+  };
+
+  const daysInMonth = getDaysInMonth(currentDate);
+  const firstDayOffset = getFirstDayOfMonth(currentDate);
+  const monthYear = getMonthYear(currentDate);
+
+  // Filter events for the current month
+  const monthEvents = events.filter((event) => {
+    if (!event.start_date) return false;
+    const eventDate = new Date(event.start_date);
+    return (
+      eventDate.getFullYear() === currentDate.getFullYear() &&
+      eventDate.getMonth() === currentDate.getMonth()
+    );
+  });
+
+  // Group events by day
+  const eventsByDay: Record<number, CalendarEvent[]> = {};
+  monthEvents.forEach((event) => {
+    if (event.start_date) {
+      const day = new Date(event.start_date).getDate();
+      if (!eventsByDay[day]) {
+        eventsByDay[day] = [];
+      }
+      eventsByDay[day].push(event);
+    }
+  });
+
   return (
     <div className="min-h-screen bg-grey-50">
       <Navigation />
@@ -44,13 +134,19 @@ export function CalendarView() {
         <div className="bg-white rounded-2xl p-8 shadow-soft">
           {/* Month Selector */}
           <div className="flex items-center justify-between mb-8">
-            <button className="p-2 hover:bg-grey-50 rounded-lg transition-colors">
+            <button 
+              onClick={handlePreviousMonth}
+              className="p-2 hover:bg-grey-50 rounded-lg transition-colors"
+            >
               <ChevronLeft className="w-5 h-5 text-grey-600" />
             </button>
             <h2 className="text-2xl" style={{ fontFamily: 'Playfair Display, serif' }}>
-              {currentMonth}
+              {monthYear}
             </h2>
-            <button className="p-2 hover:bg-grey-50 rounded-lg transition-colors">
+            <button 
+              onClick={handleNextMonth}
+              className="p-2 hover:bg-grey-50 rounded-lg transition-colors"
+            >
               <ChevronRight className="w-5 h-5 text-grey-600" />
             </button>
           </div>
@@ -65,45 +161,58 @@ export function CalendarView() {
           </div>
           
           {/* Calendar Grid */}
-          <div className="grid grid-cols-7 gap-4">
-            {/* Empty cells for offset */}
-            {[...Array(firstDayOffset)].map((_, i) => (
-              <div key={`empty-${i}`} />
-            ))}
-            
-            {/* Days */}
-            {[...Array(daysInMonth)].map((_, i) => {
-              const day = i + 1;
-              const dayEvents = calendarEvents.filter(e => e.date === day);
-              const isToday = day === 15;
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="w-8 h-8 text-rose-300 animate-spin" />
+            </div>
+          ) : error ? (
+            <div className="flex items-center justify-center py-16">
+              <p className="text-grey-600">{error}</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-7 gap-4">
+              {/* Empty cells for offset */}
+              {[...Array(firstDayOffset)].map((_, i) => (
+                <div key={`empty-${i}`} />
+              ))}
               
-              return (
-                <div
-                  key={day}
-                  className={`min-h-24 p-3 rounded-xl border-2 transition-all ${
-                    isToday
-                      ? 'border-rose-300 bg-rose-50'
-                      : 'border-grey-100 hover:border-grey-200'
-                  }`}
-                >
-                  <div className={`text-sm mb-2 ${isToday ? 'text-rose-300' : 'text-grey-700'}`}>
-                    {day}
+              {/* Days */}
+              {[...Array(daysInMonth)].map((_, i) => {
+                const day = i + 1;
+                const dayEvents = eventsByDay[day] || [];
+                const isTodayDate = isToday(currentDate, day);
+                
+                return (
+                  <div
+                    key={day}
+                    className={`min-h-24 p-3 rounded-xl border-2 transition-all ${
+                      isTodayDate
+                        ? 'border-rose-300 bg-rose-50'
+                        : 'border-grey-100 hover:border-grey-200'
+                    }`}
+                  >
+                    <div className={`text-sm mb-2 ${isTodayDate ? 'text-rose-300 font-semibold' : 'text-grey-700'}`}>
+                      {day}
+                    </div>
+                    <div className="space-y-1">
+                      {dayEvents.map((event) => (
+                        <button
+                          key={event.id}
+                          onClick={() => handleEventClick(event)}
+                          className={`w-full text-left text-xs p-2 rounded-lg text-white truncate ${
+                            eventColors[event.event_type] || 'bg-grey-400'
+                          } hover:opacity-80 transition-opacity`}
+                          title={event.title}
+                        >
+                          {event.title}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    {dayEvents.map((event, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setSelectedEvent(event)}
-                        className={`w-full text-left text-xs p-2 rounded-lg text-white ${eventColors[event.type]} hover:opacity-80 transition-opacity`}
-                      >
-                        {event.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
         
         {/* Event Legend */}
@@ -113,7 +222,7 @@ export function CalendarView() {
             {Object.entries(eventColors).map(([type, color]) => (
               <div key={type} className="flex items-center gap-2">
                 <div className={`w-4 h-4 rounded ${color}`} />
-                <span className="text-sm text-grey-600 capitalize">{type.replace('-', ' ')}</span>
+                <span className="text-sm text-grey-600 capitalize">{type.replace(/_/g, ' ')}</span>
               </div>
             ))}
           </div>
@@ -130,20 +239,35 @@ export function CalendarView() {
             className="bg-white rounded-2xl p-8 max-w-md w-full shadow-medium"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className={`w-full h-2 rounded-full mb-6 ${eventColors[selectedEvent.type]}`} />
+            <div className={`w-full h-2 rounded-full mb-6 ${
+              eventColors[selectedEvent.event_type] || 'bg-grey-400'
+            }`} />
             <h3 className="text-2xl mb-2" style={{ fontFamily: 'Playfair Display, serif' }}>
-              {selectedEvent.name}
+              {selectedEvent.title}
             </h3>
-            <p className="text-grey-600 mb-6">{currentMonth.split(' ')[0]} {selectedEvent.date}, 2024</p>
-            <p className="text-grey-700 mb-6">
-              Event details and notes will appear here.
+            <p className="text-grey-600 mb-4">
+              {formatEventDate(selectedEvent.start_date)}
+              {selectedEvent.end_date && selectedEvent.end_date !== selectedEvent.start_date && 
+                ` - ${formatEventDate(selectedEvent.end_date)}`
+              }
             </p>
-            <button
-              onClick={() => setSelectedEvent(null)}
-              className="w-full py-3 bg-grey-100 rounded-xl hover:bg-grey-200 transition-colors"
-            >
-              Close
-            </button>
+            <div className="flex gap-3 mb-6">
+              <button
+                onClick={() => {
+                  handleViewEvent(selectedEvent.id);
+                  setSelectedEvent(null);
+                }}
+                className="flex-1 py-3 bg-rose-300 text-white rounded-xl hover:bg-rose-400 transition-colors"
+              >
+                View Event
+              </button>
+              <button
+                onClick={() => setSelectedEvent(null)}
+                className="flex-1 py-3 bg-grey-100 rounded-xl hover:bg-grey-200 transition-colors"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
