@@ -235,9 +235,13 @@ class EventBudgetView(views.APIView):
         )
         budget, _ = EventBudget.objects.get_or_create(event=event)
         from django.db.models import Prefetch
+
         budget = EventBudget.objects.prefetch_related(
             "categories",
-            Prefetch("categories__line_items", queryset=BudgetLineItem.objects.filter(is_deleted=False))
+            Prefetch(
+                "categories__line_items",
+                queryset=BudgetLineItem.objects.filter(is_deleted=False),
+            ),
         ).get(id=budget.id)
         return Response({"data": EventBudgetSerializer(budget).data, "error": None})
 
@@ -262,9 +266,13 @@ class EventBudgetView(views.APIView):
 
         budget.refresh_from_db()
         from django.db.models import Prefetch
+
         budget = EventBudget.objects.prefetch_related(
             "categories",
-            Prefetch("categories__line_items", queryset=BudgetLineItem.objects.filter(is_deleted=False))
+            Prefetch(
+                "categories__line_items",
+                queryset=BudgetLineItem.objects.filter(is_deleted=False),
+            ),
         ).get(id=budget.id)
         return Response(
             {"data": EventBudgetSerializer(budget).data, "error": None}, status=201
@@ -285,7 +293,10 @@ class EventBudgetCategoryItemsView(views.APIView):
             EventBudgetCategory.objects.select_related("event_budget__event"),
             id=category_id,
         )
-        if cat.event_budget.event.couple_id != couple_id or cat.event_budget.event.is_deleted:
+        if (
+            cat.event_budget.event.couple_id != couple_id
+            or cat.event_budget.event.is_deleted
+        ):
             return Response({"data": None, "error": "Not found"}, status=404)
 
         serializer = BudgetLineItemSerializer(data=request.data)
@@ -311,6 +322,7 @@ class HoneymoonPlanView(views.APIView):
         )
         plan, _ = HoneymoonPlan.objects.get_or_create(event=event)
         from django.db.models import Prefetch
+
         plan = HoneymoonPlan.objects.prefetch_related(
             Prefetch("items", queryset=HoneymoonItem.objects.filter(is_deleted=False))
         ).get(id=plan.id)
@@ -330,6 +342,7 @@ class HoneymoonPlanView(views.APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         from django.db.models import Prefetch
+
         plan = HoneymoonPlan.objects.prefetch_related(
             Prefetch("items", queryset=HoneymoonItem.objects.filter(is_deleted=False))
         ).get(id=plan.id)
@@ -412,8 +425,14 @@ class MoodBoardView(views.APIView):
             event=event, defaults={"is_enabled": True}
         )
         from django.db.models import Prefetch
+
         board = MoodBoard.objects.prefetch_related(
-            Prefetch("items", queryset=MoodBoardItem.objects.filter(is_deleted=False).select_related("media"))
+            Prefetch(
+                "items",
+                queryset=MoodBoardItem.objects.filter(is_deleted=False).select_related(
+                    "media"
+                ),
+            )
         ).get(id=board.id)
         return Response({"data": MoodBoardSerializer(board).data, "error": None})
 
