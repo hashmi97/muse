@@ -11,9 +11,12 @@ class AuthTests(APITestCase):
         payload = {
             "email": "test@example.com",
             "password": "password123",
-            "full_name": "Test User",
+            "first_name": "Test",
+            "last_name": "User",
             "role": "groom",
             "partner_email": "partner@example.com",
+            "partner_first_name": "Partner",
+            "partner_last_name": "User",
         }
         url = reverse("signup")
         res = self.client.post(url, payload, format="json")
@@ -40,9 +43,12 @@ class InviteFlowTests(APITestCase):
         payload = {
             "email": "owner@example.com",
             "password": "password123",
-            "full_name": "Owner",
+            "first_name": "Owner",
+            "last_name": "User",
             "role": "groom",
             "partner_email": "partner@example.com",
+            "partner_first_name": "Partner",
+            "partner_last_name": "User",
         }
         res = self.client.post(reverse("signup"), payload, format="json")
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)

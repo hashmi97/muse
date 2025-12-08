@@ -44,9 +44,24 @@ class SignupView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         partner_email = getattr(user, "_partner_email", None)
+        partner_first_name = getattr(user, "_partner_first_name", "")
+        partner_last_name = getattr(user, "_partner_last_name", "")
 
-        # Create couple + membership
-        couple_name = "{} & Partner's Wedding".format(user.full_name)
+        # Generate couple name from first names with capitalized first letters
+        groom_first_name = ""
+        bride_first_name = ""
+        if user.role == "groom":
+            groom_first_name = user.first_name.strip() if user.first_name else ""
+            bride_first_name = partner_first_name.strip() if partner_first_name else ""
+        else:  # user.role == "bride"
+            bride_first_name = user.first_name.strip() if user.first_name else ""
+            groom_first_name = partner_first_name.strip() if partner_first_name else ""
+        
+        # Capitalize first letter of each name
+        groom_name = groom_first_name.capitalize() if groom_first_name else "Groom"
+        bride_name = bride_first_name.capitalize() if bride_first_name else "Bride"
+        couple_name = f"{groom_name} & {bride_name}"
+        
         couple = Couple.objects.create(name=couple_name)
         CoupleMember.objects.create(
             couple=couple,
@@ -72,7 +87,8 @@ class SignupView(APIView):
                 partner_user = User.objects.create_user(
                     email=partner_email,
                     password=generated_pw,
-                    full_name="",
+                    first_name=partner_first_name or "",
+                    last_name=partner_last_name or "",
                     role=partner_role,
                 )
             CoupleMember.objects.get_or_create(
@@ -83,8 +99,9 @@ class SignupView(APIView):
 
             if created:
                 login_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173/login")
+                user_display_name = f"{user.first_name} {user.last_name}".strip() or user.email
                 body_lines = [
-                    f"{user.full_name} added you to your wedding workspace on Muse.",
+                    f"{user_display_name} added you to your wedding workspace on Muse.",
                 ]
                 if generated_pw:
                     body_lines.append("An account was created for you.")

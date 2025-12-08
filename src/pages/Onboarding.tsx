@@ -116,6 +116,12 @@ export function Onboarding() {
         </div>
 
         {/* Event Grid */}
+        {!loading && resolvedEvents.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-grey-600 mb-4">No events available. Please contact support.</p>
+            {error && <p className="text-sm text-rose-500">{error}</p>}
+          </div>
+        )}
         <div
           className="grid gap-6 w-full justify-center"
           style={{ gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", justifyItems: "center" }}
@@ -196,12 +202,17 @@ export function Onboarding() {
         <div className="flex justify-center mt-8">
           <button
             onClick={handleContinue}
-            disabled={selectedEvents.size === 0 || loading}
+            disabled={selectedEvents.size === 0 || loading || saving}
             className="px-20 py-4 bg-rose-300 text-white rounded-full hover:bg-rose-400 transition-colors shadow-soft disabled:opacity-50 disabled:cursor-not-allowed text-base font-medium"
           >
-            {saving ? "Saving..." : "Continue to Dashboard"}
+            {saving ? "Saving..." : selectedEvents.size === 0 ? "Select at least one event" : "Continue to Dashboard"}
           </button>
         </div>
+        {error && !loading && (
+          <div className="text-center mt-4">
+            <p className="text-sm text-rose-500">{error}</p>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -8,7 +8,7 @@ type AuthContextValue = {
   loading: boolean;
   error: string | null;
   signup: (
-    payload: { email: string; password: string; full_name?: string; role: "bride" | "groom"; partner_email: string }
+    payload: { email: string; password: string; first_name: string; last_name: string; role: "bride" | "groom"; partner_email: string; partner_first_name: string; partner_last_name: string }
   ) => Promise<void>;
   login: (payload: { email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
@@ -50,9 +50,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (payload: {
       email: string;
       password: string;
-      full_name?: string;
+      first_name: string;
+      last_name: string;
       role: "bride" | "groom";
       partner_email: string;
+      partner_first_name: string;
+      partner_last_name: string;
     }) => {
       setError(null);
       const data = await api.signup(payload);

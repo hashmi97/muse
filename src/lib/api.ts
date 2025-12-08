@@ -3,7 +3,8 @@ const API_BASE = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:4000/api";
 export type ApiUser = {
   id: number;
   email: string;
-  full_name?: string;
+  first_name?: string;
+  last_name?: string;
   role: string;
   avatar_url?: string;
 };
@@ -75,9 +76,12 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 export async function signup(payload: {
   email: string;
   password: string;
-  full_name?: string;
+  first_name: string;
+  last_name: string;
   role: "bride" | "groom";
   partner_email: string;
+  partner_first_name: string;
+  partner_last_name: string;
 }) {
   return request<{ user: ApiUser; access: string; refresh?: string }>("/auth/signup/", {
     method: "POST",
@@ -118,4 +122,59 @@ export async function submitEventSelection(
     token,
     body: { selections },
   });
+}
+
+export type DashboardUpcomingEvent = {
+  id: number;
+  title: string;
+  event_type: string;
+  start_date: string | null;
+  end_date: string | null;
+};
+
+export type DashboardBudget = {
+  planned: string;
+  spent: string;
+};
+
+export type DashboardHoneymoon = {
+  id: number;
+  event_id: number;
+  destination_country: string;
+  destination_city: string;
+  start_date: string | null;
+  end_date: string | null;
+  total_planned: string;
+  total_spent: string;
+} | null;
+
+export type DashboardMoodboardHighlight = {
+  id: number;
+  event_id: number;
+  caption: string;
+  media_url: string;
+  created_at: string;
+};
+
+export type DashboardActivity = {
+  id: number;
+  verb: string;
+  actor_id: number | null;
+  target_type: string | null;
+  target_id: number | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
+export type DashboardSummary = {
+  couple_name: string | null;
+  upcoming_events: DashboardUpcomingEvent[];
+  budget: DashboardBudget;
+  honeymoon: DashboardHoneymoon;
+  moodboard_highlights: DashboardMoodboardHighlight[];
+  recent_activity: DashboardActivity[];
+};
+
+export async function fetchDashboardSummary(token: string | null) {
+  return request<DashboardSummary>("/dashboard/summary/", { token });
 }

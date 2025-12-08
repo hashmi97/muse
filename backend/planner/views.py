@@ -16,6 +16,7 @@ from .models import (
     BudgetCategory,
     BudgetLineItem,
     Comment,
+    Couple,
     CoupleMember,
     Event,
     EventBudget,
@@ -671,6 +672,7 @@ class DashboardSummaryView(views.APIView):
             return Response(
                 {
                     "data": {
+                        "couple_name": None,
                         "upcoming_events": [],
                         "budget": {"planned": "0.00", "spent": "0.00"},
                         "honeymoon": None,
@@ -765,9 +767,13 @@ class DashboardSummaryView(views.APIView):
             for a in activity
         ]
 
+        couple = Couple.objects.filter(id=couple_id).first()
+        couple_name = couple.name if couple else None
+
         return Response(
             {
                 "data": {
+                    "couple_name": couple_name,
                     "upcoming_events": upcoming,
                     "budget": budget_summary,
                     "honeymoon": honeymoon_summary,

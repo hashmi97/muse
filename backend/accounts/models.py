@@ -40,7 +40,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     )
 
     email = models.EmailField(unique=True)
-    full_name = models.CharField(max_length=255, blank=True)
+    first_name = models.CharField(max_length=100, blank=True)
+    last_name = models.CharField(max_length=100, blank=True)
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default="other")
     avatar_url = models.URLField(blank=True)
 
