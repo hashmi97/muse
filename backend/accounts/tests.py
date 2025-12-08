@@ -6,7 +6,13 @@ from .models import User
 
 class AuthTests(APITestCase):
     def test_signup_returns_tokens(self):
-        payload = {"email": "test@example.com", "password": "password123", "full_name": "Test User"}
+        payload = {
+            "email": "test@example.com",
+            "password": "password123",
+            "full_name": "Test User",
+            "role": "groom",
+            "partner_email": "partner@example.com",
+        }
         url = reverse("signup")
         res = self.client.post(url, payload, format="json")
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)

@@ -186,4 +186,21 @@ class HoneymoonItem(models.Model):
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
-# Create your models here.
+
+class CoupleInvite(models.Model):
+    STATUS_CHOICES = (
+        ("pending", "Pending"),
+        ("sent", "Sent"),
+        ("accepted", "Accepted"),
+    )
+
+    couple = models.ForeignKey(Couple, on_delete=models.CASCADE, related_name="invites")
+    email = models.EmailField()
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("couple", "email")
+
+    def __str__(self):
+        return f"Invite {self.email} for {self.couple}"

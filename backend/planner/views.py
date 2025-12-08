@@ -36,7 +36,11 @@ from .serializers import (
 
 
 def _active_couple_id(user_id):
-    membership = CoupleMember.objects.filter(user_id=user_id, status="active").order_by("created_at").first()
+    membership = (
+        CoupleMember.objects.filter(user_id=user_id, status="active")
+        .order_by("created_at")
+        .first()
+    )
     return membership.couple_id if membership else None
 
 
@@ -52,7 +56,11 @@ class EventTypesView(views.APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        onboarding_only = request.query_params.get("onboardingOnly") in ("true", "1", "yes")
+        onboarding_only = request.query_params.get("onboardingOnly") in (
+            "true",
+            "1",
+            "yes",
+        )
         qs = EventType.objects.all()
         if onboarding_only:
             qs = qs.exclude(key="engagement")
@@ -68,8 +76,12 @@ class EventsListView(views.APIView):
         couple_id = _active_couple_id(request.user.id)
         if not couple_id:
             return Response({"data": [], "error": None})
-        events = Event.objects.filter(couple_id=couple_id, is_active=True).select_related("event_type")
-        return Response({"data": EventSerializer(events, many=True).data, "error": None})
+        events = Event.objects.filter(
+            couple_id=couple_id, is_active=True
+        ).select_related("event_type")
+        return Response(
+            {"data": EventSerializer(events, many=True).data, "error": None}
+        )
 
 
 class EventSelectionView(views.APIView):
@@ -84,11 +96,15 @@ class EventSelectionView(views.APIView):
         user = request.user
         couple_id = _active_couple_id(user.id)
         if not couple_id:
-            return Response({"data": None, "error": "No active couple membership"}, status=404)
+            return Response(
+                {"data": None, "error": "No active couple membership"}, status=404
+            )
 
         selections = request.data.get("selections", [])
         if not isinstance(selections, list):
-            return Response({"data": None, "error": "selections must be a list"}, status=400)
+            return Response(
+                {"data": None, "error": "selections must be a list"}, status=400
+            )
 
         types_by_key = {et.key: et for et in EventType.objects.all()}
         keep_ids = []
@@ -116,12 +132,16 @@ class EventSelectionView(views.APIView):
             )
 
         # Deactivate unselected events (except engagement)
-        Event.objects.filter(couple_id=couple_id).exclude(event_type__key="engagement").exclude(id__in=keep_ids).update(
-            is_active=False
-        )
+        Event.objects.filter(couple_id=couple_id).exclude(
+            event_type__key="engagement"
+        ).exclude(id__in=keep_ids).update(is_active=False)
 
-        events = Event.objects.filter(couple_id=couple_id, is_active=True).select_related("event_type")
-        return Response({"data": EventSerializer(events, many=True).data, "error": None})
+        events = Event.objects.filter(
+            couple_id=couple_id, is_active=True
+        ).select_related("event_type")
+        return Response(
+            {"data": EventSerializer(events, many=True).data, "error": None}
+        )
 
 
 class CalendarView(views.APIView):
@@ -132,7 +152,9 @@ class CalendarView(views.APIView):
         couple_id = _active_couple_id(request.user.id)
         if not couple_id:
             return Response({"data": [], "error": None})
-        events = Event.objects.filter(couple_id=couple_id, is_active=True).select_related("event_type")
+        events = Event.objects.filter(
+            couple_id=couple_id, is_active=True
+        ).select_related("event_type")
         data = [
             {
                 "id": e.id,
@@ -153,28 +175,44 @@ class EventBudgetView(views.APIView):
     def get(self, request, event_id):
         couple_id = _active_couple_id(request.user.id)
         if not couple_id:
-            return Response({"data": None, "error": "No active couple membership"}, status=404)
-        event = get_object_or_404(Event.objects.filter(id=event_id, couple_id=couple_id))
+            return Response(
+                {"data": None, "error": "No active couple membership"}, status=404
+            )
+        event = get_object_or_404(
+            Event.objects.filter(id=event_id, couple_id=couple_id)
+        )
         budget, _ = EventBudget.objects.get_or_create(event=event)
-        budget = EventBudget.objects.prefetch_related("categories__line_items").get(id=budget.id)
+        budget = EventBudget.objects.prefetch_related("categories__line_items").get(
+            id=budget.id
+        )
         return Response({"data": EventBudgetSerializer(budget).data, "error": None})
 
     def post(self, request, event_id):
         couple_id = _active_couple_id(request.user.id)
         if not couple_id:
-            return Response({"data": None, "error": "No active couple membership"}, status=404)
-        event = get_object_or_404(Event.objects.filter(id=event_id, couple_id=couple_id))
+            return Response(
+                {"data": None, "error": "No active couple membership"}, status=404
+            )
+        event = get_object_or_404(
+            Event.objects.filter(id=event_id, couple_id=couple_id)
+        )
         budget, _ = EventBudget.objects.get_or_create(event=event)
 
         # Attach category (optional)
         category_id = request.data.get("category_id")
         if category_id:
             category = get_object_or_404(BudgetCategory, id=category_id)
-            EventBudgetCategory.objects.get_or_create(event_budget=budget, category=category)
+            EventBudgetCategory.objects.get_or_create(
+                event_budget=budget, category=category
+            )
 
         budget.refresh_from_db()
-        budget = EventBudget.objects.prefetch_related("categories__line_items").get(id=budget.id)
-        return Response({"data": EventBudgetSerializer(budget).data, "error": None}, status=201)
+        budget = EventBudget.objects.prefetch_related("categories__line_items").get(
+            id=budget.id
+        )
+        return Response(
+            {"data": EventBudgetSerializer(budget).data, "error": None}, status=201
+        )
 
 
 class EventBudgetCategoryItemsView(views.APIView):
@@ -184,7 +222,9 @@ class EventBudgetCategoryItemsView(views.APIView):
     def post(self, request, category_id):
         couple_id = _active_couple_id(request.user.id)
         if not couple_id:
-            return Response({"data": None, "error": "No active couple membership"}, status=404)
+            return Response(
+                {"data": None, "error": "No active couple membership"}, status=404
+            )
         cat = get_object_or_404(
             EventBudgetCategory.objects.select_related("event_budget__event"),
             id=category_id,
@@ -195,7 +235,9 @@ class EventBudgetCategoryItemsView(views.APIView):
         serializer = BudgetLineItemSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         item = serializer.save(event_budget_category=cat, created_by=request.user)
-        return Response({"data": BudgetLineItemSerializer(item).data, "error": None}, status=201)
+        return Response(
+            {"data": BudgetLineItemSerializer(item).data, "error": None}, status=201
+        )
 
 
 class HoneymoonPlanView(views.APIView):
@@ -205,8 +247,12 @@ class HoneymoonPlanView(views.APIView):
     def get(self, request, event_id):
         couple_id = _active_couple_id(request.user.id)
         if not couple_id:
-            return Response({"data": None, "error": "No active couple membership"}, status=404)
-        event = get_object_or_404(Event.objects.filter(id=event_id, couple_id=couple_id))
+            return Response(
+                {"data": None, "error": "No active couple membership"}, status=404
+            )
+        event = get_object_or_404(
+            Event.objects.filter(id=event_id, couple_id=couple_id)
+        )
         plan, _ = HoneymoonPlan.objects.get_or_create(event=event)
         plan = HoneymoonPlan.objects.prefetch_related("items").get(id=plan.id)
         return Response({"data": HoneymoonPlanSerializer(plan).data, "error": None})
@@ -214,8 +260,12 @@ class HoneymoonPlanView(views.APIView):
     def post(self, request, event_id):
         couple_id = _active_couple_id(request.user.id)
         if not couple_id:
-            return Response({"data": None, "error": "No active couple membership"}, status=404)
-        event = get_object_or_404(Event.objects.filter(id=event_id, couple_id=couple_id))
+            return Response(
+                {"data": None, "error": "No active couple membership"}, status=404
+            )
+        event = get_object_or_404(
+            Event.objects.filter(id=event_id, couple_id=couple_id)
+        )
         plan, _ = HoneymoonPlan.objects.get_or_create(event=event)
         serializer = HoneymoonPlanSerializer(plan, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -231,14 +281,20 @@ class HoneymoonItemView(views.APIView):
     def post(self, request, plan_id):
         couple_id = _active_couple_id(request.user.id)
         if not couple_id:
-            return Response({"data": None, "error": "No active couple membership"}, status=404)
-        plan = get_object_or_404(HoneymoonPlan.objects.select_related("event"), id=plan_id)
+            return Response(
+                {"data": None, "error": "No active couple membership"}, status=404
+            )
+        plan = get_object_or_404(
+            HoneymoonPlan.objects.select_related("event"), id=plan_id
+        )
         if plan.event.couple_id != couple_id:
             return Response({"data": None, "error": "Not found"}, status=404)
         serializer = HoneymoonItemSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         item = serializer.save(honeymoon_plan=plan)
-        return Response({"data": HoneymoonItemSerializer(item).data, "error": None}, status=201)
+        return Response(
+            {"data": HoneymoonItemSerializer(item).data, "error": None}, status=201
+        )
 
 
 class MediaUploadView(views.APIView):
@@ -250,7 +306,9 @@ class MediaUploadView(views.APIView):
         user = request.user
         couple_id = _active_couple_id(user.id)
         if not couple_id:
-            return Response({"data": None, "error": "No active couple membership"}, status=404)
+            return Response(
+                {"data": None, "error": "No active couple membership"}, status=404
+            )
 
         file_obj = request.FILES.get("file")
         if not file_obj:
@@ -268,7 +326,9 @@ class MediaUploadView(views.APIView):
             size_bytes=file_obj.size,
             uploaded_by=user,
         )
-        return Response({"data": MediaFileSerializer(media).data, "error": None}, status=201)
+        return Response(
+            {"data": MediaFileSerializer(media).data, "error": None}, status=201
+        )
 
 
 class MoodBoardView(views.APIView):
@@ -279,10 +339,14 @@ class MoodBoardView(views.APIView):
         user = request.user
         couple_id = _active_couple_id(user.id)
         if not couple_id:
-            return Response({"data": None, "error": "No active couple membership"}, status=404)
+            return Response(
+                {"data": None, "error": "No active couple membership"}, status=404
+            )
 
         event = get_object_or_404(Event, id=event_id, couple_id=couple_id)
-        board, _ = MoodBoard.objects.get_or_create(event=event, defaults={"is_enabled": True})
+        board, _ = MoodBoard.objects.get_or_create(
+            event=event, defaults={"is_enabled": True}
+        )
         board = MoodBoard.objects.prefetch_related("items__media").get(id=board.id)
         return Response({"data": MoodBoardSerializer(board).data, "error": None})
 
@@ -290,15 +354,21 @@ class MoodBoardView(views.APIView):
         user = request.user
         couple_id = _active_couple_id(user.id)
         if not couple_id:
-            return Response({"data": None, "error": "No active couple membership"}, status=404)
+            return Response(
+                {"data": None, "error": "No active couple membership"}, status=404
+            )
 
         event = get_object_or_404(Event, id=event_id, couple_id=couple_id)
-        board, _ = MoodBoard.objects.get_or_create(event=event, defaults={"is_enabled": True})
+        board, _ = MoodBoard.objects.get_or_create(
+            event=event, defaults={"is_enabled": True}
+        )
 
         serializer = MoodBoardItemSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         item = serializer.save(mood_board=board, created_by=user)
-        return Response({"data": MoodBoardItemSerializer(item).data, "error": None}, status=201)
+        return Response(
+            {"data": MoodBoardItemSerializer(item).data, "error": None}, status=201
+        )
 
 
 class MoodBoardItemDeleteView(views.APIView):
@@ -309,7 +379,9 @@ class MoodBoardItemDeleteView(views.APIView):
         user = request.user
         couple_id = _active_couple_id(user.id)
         if not couple_id:
-            return Response({"data": None, "error": "No active couple membership"}, status=404)
+            return Response(
+                {"data": None, "error": "No active couple membership"}, status=404
+            )
 
         item = get_object_or_404(
             MoodBoardItem.objects.select_related("mood_board__event"),
