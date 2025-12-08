@@ -1,10 +1,7 @@
 [project]
 name = "muse-backend-py"
 version = "0.1.0"
-description = ""
-authors = [
-    {name = "Hisham",email = "46504631+hashmi97@users.noreply.github.com"}
-]
+description = "Muse backend (Django + DRF)"
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 dependencies = [
@@ -22,6 +19,10 @@ dependencies = [
 ]
 
 [tool.poetry]
+name = "muse-backend-py"
+version = "0.1.0"
+description = "Muse backend (Django + DRF)"
+authors = ["Hisham <46504631+hashmi97@users.noreply.github.com>"]
 packages = [{include = "backend", from = "src"}]
 
 [build-system]
